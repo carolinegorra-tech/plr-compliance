@@ -210,11 +210,16 @@ export default function PLRAnalyzer() {
         text: "Analise o acordo coletivo de PLR acima conforme o checklist completo de formalidades. Retorne o JSON conforme instruído."
       });
 
+      const apiKey = process.env.REACT_APP_ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error("API key não configurada. Verifique a variável REACT_APP_ANTHROPIC_API_KEY no Vercel.");
+      }
+
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": process.env.REACT_APP_ANTHROPIC_API_KEY,
+          "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
           "anthropic-dangerous-direct-browser-access": "true"
         },
@@ -226,6 +231,11 @@ export default function PLRAnalyzer() {
         })
       });
 
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `Erro da API: ${response.status} ${response.statusText}`);
+      }
+
       const data = await response.json();
       const rawText = data.content.map(i => i.text || "").join("");
       const clean = rawText.replace(/```json|```/g, "").trim();
@@ -233,7 +243,7 @@ export default function PLRAnalyzer() {
       setResult(parsed);
       setStep("result");
     } catch (err) {
-      setError("Erro ao processar o documento. Verifique o arquivo e tente novamente.");
+      setError(err.message || "Erro desconhecido ao processar o documento.");
       setStep("upload");
     } finally {
       setLoading(false);
