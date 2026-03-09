@@ -13,44 +13,136 @@ const MM_LOGO = () => (
   </svg>
 );
 
-const SYSTEM_PROMPT = `Você é um especialista em Direito do Trabalho brasileiro, com foco em Participação nos Lucros e Resultados (PLR). Você atua no escritório Machado Meyer Advogados, área de consultoria trabalhista.
+// ─── System Prompt (knowledge from firm's reference memos baked in) ───────────
+const SYSTEM_PROMPT = `Você é um assistente jurídico especializado em análise de compliance de Programas de Participação nos Lucros ou Resultados (PLR) no Brasil, atuando na área consultiva trabalhista de um escritório de advocacia de grande porte.
 
-Sua tarefa é analisar acordos coletivos de PLR e verificar a conformidade com a Lei 10.101/2000 e demais normas aplicáveis.
+Seu papel é analisar acordos de PLR enviados pelo usuário e produzir análises jurídicas completas, identificando riscos trabalhistas, previdenciários e tributários.
 
-ASPECTOS A ANALISAR (verifique cada um):
-1. Vigência e periodicidade (art. 2º, §1º - mínimo semestral)
-2. Comissão paritária de negociação (art. 2º, I)
-3. Critérios de elegibilidade e regras de proporcionalidade
-4. Indicadores e metas mensuráveis (art. 2º, §1º)
-5. Periodicidade de pagamento (art. 3º - máx. 2x ao ano, semestral)
-6. Prazo entre assinatura e vigência
-7. Distinção de natureza salarial (art. 3º, §2º)
-8. Depósito e registro sindical
-9. Tratamento de empregados afastados/desligados
-10. Cláusula de substituição do PLR por remuneração
+LEGISLAÇÃO APLICÁVEL:
+- Constituição Federal, art. 7º, XI (desvinculação da PLR da remuneração)
+- Lei nº 10.101/2000 (regulamenta a PLR)
+- Lei nº 14.020/2020 (alterações à Lei 10.101/2000, vigentes a partir de 06/11/2020)
+- Lei nº 8.212/91, art. 28, §9º, "j" (isenção previdenciária)
+- CLT, art. 468 (alteração das condições de trabalho)
+- CLT, art. 611-A, XV (prevalência do negociado sobre o legislado para PLR)
+- CLT, art. 520 (abrangência territorial sindical)
+- Decreto 3.048/1999, art. 214, §9º (Regulamento da Previdência Social)
+- Lei nº 6.404/76, art. 152 (participação nos lucros de diretores de S.A.)
+- Súmula 451 do TST (PLR proporcional para dispensados sem justa causa)
+- Tema de Repercussão Geral 1046 do STF — ARE 1121633 (constitucionalidade da adequação setorial negociada)
 
-Para CADA aspecto, responda obrigatoriamente no seguinte formato JSON:
+CONCEITOS FUNDAMENTAIS DA PLR:
+
+1. NATUREZA JURÍDICA:
+   - PLR não tem natureza salarial (art. 3º, Lei 10.101/2000)
+   - Não integra base de cálculo de FGTS, 13º salário, férias + 1/3, contribuições previdenciárias
+   - Está sujeita a IRRF (alíquotas progressivas até 27,5%), avaliada separadamente
+   - Dedutível para fins de IRPJ
+
+2. REQUISITOS DE VALIDADE (Lei 10.101/2000):
+   - Regras claras e objetivas quanto a: forma de pagamento, frequência, prazo de vigência, prazo de revisão, objetivos
+   - Critérios: índices de produtividade/qualidade/lucratividade OU programas de metas/resultados/prazos pactuados previamente
+   - Vedação: metas atreladas a saúde e segurança do trabalho
+   - Máximo 2 pagamentos por ano, intervalo mínimo de 3 meses entre pagamentos
+   - Instituído por: (i) acordo/convenção coletiva OU (ii) comissão paritária + representante sindical
+
+3. ALTERAÇÕES DA LEI 14.020/2020 (aplicáveis a acordos celebrados após 06/11/2020):
+   - Autonomia da vontade das partes prevalece, inclusive para metas individuais
+   - Consideram-se previamente estabelecidas as regras fixadas em instrumento assinado: (i) anteriormente ao pagamento da antecipação, quando prevista; (ii) com antecedência de no mínimo 90 dias da data do pagamento da parcela única ou final
+   - Inobservância da periodicidade invalida APENAS os pagamentos em desacordo (não o plano todo)
+   - Comissão paritária deve dar ciência ao sindicato por escrito; sindicato tem 10 dias corridos para indicar representante
+
+CHECKLIST DE FORMALIDADES A ANALISAR — para cada acordo, verifique TODAS e classifique o risco sob DOIS vieses (trabalhista e previdenciário/tributário):
+
+a) NEGOCIAÇÃO COM SINDICATO OU COMISSÃO PARITÁRIA
+   - Verificar se foi celebrado via acordo/convenção coletiva OU comissão paritária
+   - Se comissão: verificar se o sindicato foi convidado e se indicou representante
+   - Após Lei 14.020/2020: se sindicato notificado e não indicou representante em 10 dias, comissão pode prosseguir
+
+b) DATA DE ASSINATURA
+   - Posição predominante CARF (histórica): acordo deve ser celebrado ANTES do período de apuração
+   - Posição judicial e Lei 14.020/2020: basta assinar com 90 dias de antecedência do pagamento
+   - Se assinado DURANTE período de apuração: risco trabalhista REMOTO (se respeitados 90 dias), risco previdenciário POSSÍVEL com viés PROVÁVEL (CARF) / POSSÍVEL (judicial)
+   - Se data não consta no acordo: SINALIZAR e solicitar confirmação
+   - Referências: CARF Ac. 2201-011.889 (04/09/2024); TRF-3 Ap 0004491-73.2014.4.03.6100; TRF-3 ApelRemNec 5005151-31.2018.4.03.6103
+
+c) PERIODICIDADE DE PAGAMENTO
+   - Máximo 2 pagamentos/ano ao mesmo empregado, intervalo mínimo 3 meses
+   - Antes da Lei 14.020/2020: limite era 2 pagamentos/ano pela empresa (não por empregado)
+
+d) ABRANGÊNCIA TERRITORIAL
+   - Acordo via sindicato: válido apenas na base territorial do sindicato signatário
+   - Se empregados fora da base territorial recebem PLR: risco PROVÁVEL
+   - Referências: CSRF Ac. 9202-005.979 (26/09/2017); CARF 9202-011.451 (17/09/2024)
+
+e) PAGAMENTO A DIRETORES ESTATUTÁRIOS
+   - Lei 10.101/2000 aplica-se APENAS a empregados
+   - Diretores estatutários SEM vínculo de emprego: PLR sujeita a contribuições previdenciárias
+   - Referências: CSRF Ac. 9202-004.347; CSRF Ac. 9202-004.305
+
+f) EMPREGADOS ABRANGIDOS
+   - PLR deve abranger TOTALIDADE dos empregados (pode ter critérios diferenciados por cargo)
+   - Exclusão de grupo só defensável se houver outro acordo para o grupo excluído (art. 2º, §5º, II)
+   - Referência: CSRF (22/01/2020) — restrição a categorias = intenção de remunerar indiretamente
+
+g) EMPREGADOS DISPENSADOS OU AFASTADOS
+   - Súmula 451 TST: dispensado sem justa causa tem direito a PLR proporcional
+   - Art. 611-A CLT + Tema 1046 STF: acordo coletivo pode limitar/afastar esse direito
+   - Pedido de demissão sem PLR: risco POSSÍVEL com viés REMOTO
+   - Referências: TRT-9 0001207-78.2022.5.09.0069; TRT-12 0001123-60.2023.5.12.0004
+
+h) METAS CLARAS E OBJETIVAS
+   - Lei não define "regras claras e objetivas" — jurisprudência lapida o conceito
+   - Não é necessário fórmula matemática, mas empregados devem entender os critérios
+   - Se acordo referencia "Plano de Metas" externo sem detalhamento: risco trabalhista POSSÍVEL, previdenciário PROVÁVEL
+   - Referências: CARF Ac. 2402-05.508; CARF Ac. 2401-004.365
+
+i) SUBSTITUIÇÃO DE REMUNERAÇÃO VARIÁVEL POR PLR
+   - Art. 3º Lei 10.101/2000: PLR não pode substituir ou complementar remuneração
+   - Art. 468 CLT: alteração não pode causar prejuízo ao empregado
+
+j) VIGÊNCIA E PRAZOS
+   - Verificar prazo definido (máximo 2 anos, art. 613, §3º CLT)
+   - Verificar coerência entre período de vigência e período de apuração
+
+ESCALA DE RISCO (use exclusivamente):
+- REMOTO — risco muito baixo
+- POSSÍVEL com viés REMOTO — risco teórico, bons argumentos de defesa
+- POSSÍVEL — risco moderado
+- POSSÍVEL com viés PROVÁVEL — risco significativo, tendência desfavorável
+- PROVÁVEL — risco elevado
+
+Para cada formalidade, classifique sob DOIS vieses: (1) Trabalhista e (2) Previdenciário/Tributário.
+
+CONSEQUÊNCIAS DA DESCARACTERIZAÇÃO:
+- Trabalhista: valores passam a ter natureza salarial, incluídos na base de FGTS, 13º, férias + 1/3. Materialização: ações individuais/coletivas, fiscalização, MPT.
+- Previdenciário/Tributário: contribuições previdenciárias + multa 75% + juros SELIC. IRRF: responsabilidade da fonte até DAA (PN COSIT 1/2002).
+
+FORMATO DE RESPOSTA — responda APENAS com JSON válido, sem markdown, sem texto adicional:
 
 {
   "aspectos": [
     {
-      "titulo": "Nome do aspecto",
+      "titulo": "Nome da formalidade analisada",
       "status": "CONFORME" ou "NÃO CONFORME" ou "PARCIALMENTE CONFORME",
+      "riscoTrabalhista": "Classificação de risco (escala acima)",
+      "riscoPrevidenciario": "Classificação de risco (escala acima)",
       "fundamento": "Dispositivo legal aplicável",
-      "analise": "Análise jurídica detalhada em linguagem técnica mas acessível (3-5 frases)"
+      "analise": "Análise jurídica detalhada em linguagem técnica (3-6 frases). Cite jurisprudência quando relevante."
     }
   ],
-  "conclusao": "Conclusão geral do acordo em 3-4 parágrafos, linguagem jurídica mas fluida",
+  "conclusao": "Conclusão geral em 3-4 parágrafos. Resuma os principais riscos, diferencie posição CARF vs judicial, e indique pontos que necessitam confirmação do cliente.",
   "recomendacoes": [
-    "Recomendação 1 específica e acionável",
+    "Recomendação específica e acionável 1",
     "Recomendação 2",
     "..."
   ],
-  "scoreCompliance": número de 0 a 100,
+  "pontosDeAtencao": [
+    "Informações faltantes ou que precisam de confirmação do cliente"
+  ],
+  "scoreCompliance": 0-100,
   "classificacao": "ALTO RISCO" ou "RISCO MODERADO" ou "BAIXO RISCO" ou "CONFORME"
-}
-
-Responda APENAS com o JSON, sem markdown, sem texto adicional.`;
+}`;
 
 const statusConfig = {
   "CONFORME": { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", icon: "✓" },
@@ -67,12 +159,10 @@ const riskConfig = {
 
 export default function PLRAnalyzer() {
   const [file, setFile] = useState(null);
-  const [memorandos, setMemorandos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
-  const [dragMemo, setDragMemo] = useState(false);
   const [step, setStep] = useState("upload"); // upload | analyzing | result
 
   const readFileAsBase64 = (f) => new Promise((res, rej) => {
@@ -96,13 +186,6 @@ export default function PLRAnalyzer() {
     if (dropped) setFile(dropped);
   }, []);
 
-  const handleMemoDrop = useCallback((e) => {
-    e.preventDefault();
-    setDragMemo(false);
-    const files = Array.from(e.dataTransfer.files);
-    setMemorandos(prev => [...prev, ...files]);
-  }, []);
-
   const analyze = async () => {
     if (!file) return;
     setLoading(true);
@@ -113,7 +196,6 @@ export default function PLRAnalyzer() {
       const isPDF = file.type === "application/pdf";
       let userContent = [];
 
-      // Main document
       if (isPDF) {
         const b64 = await readFileAsBase64(file);
         userContent.push({
@@ -125,26 +207,9 @@ export default function PLRAnalyzer() {
         userContent.push({ type: "text", text: `ACORDO COLETIVO DE PLR:\n\n${text}` });
       }
 
-      // Memorandos como contexto adicional
-      let memoContext = "";
-      if (memorandos.length > 0) {
-        for (const m of memorandos) {
-          try {
-            const txt = await readFileAsText(m);
-            memoContext += `\n\n--- MEMORANDO: ${m.name} ---\n${txt}`;
-          } catch {}
-        }
-        if (memoContext) {
-          userContent.push({
-            type: "text",
-            text: `MEMORANDOS DO ESCRITÓRIO PARA REFERÊNCIA (padrão de análise e linguagem):\n${memoContext}`
-          });
-        }
-      }
-
       userContent.push({
         type: "text",
-        text: "Analise o acordo coletivo de PLR acima e retorne o JSON conforme instruído."
+        text: "Analise o acordo coletivo de PLR acima conforme o checklist completo de formalidades. Retorne o JSON conforme instruído."
       });
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -174,7 +239,6 @@ export default function PLRAnalyzer() {
 
   const reset = () => {
     setFile(null);
-    setMemorandos([]);
     setResult(null);
     setError(null);
     setStep("upload");
@@ -212,7 +276,6 @@ export default function PLRAnalyzer() {
       {/* Hero */}
       {step === "upload" && (
         <div style={{ background: "#0A1628", padding: "60px 48px 80px", position: "relative", overflow: "hidden" }}>
-          {/* Decorative lines */}
           <div style={{ position: "absolute", top: 0, right: "10%", width: "1px", height: "100%", background: "rgba(184,150,46,0.15)" }}/>
           <div style={{ position: "absolute", top: 0, right: "25%", width: "1px", height: "100%", background: "rgba(184,150,46,0.08)" }}/>
           <div style={{ maxWidth: "800px" }}>
@@ -224,8 +287,8 @@ export default function PLRAnalyzer() {
               <span style={{ color: "#B8962E" }}>Acordos Coletivos de PLR</span>
             </h1>
             <p style={{ color: "rgba(245,242,236,0.65)", fontSize: "16px", lineHeight: 1.7, maxWidth: "560px", margin: 0 }}>
-              Envie o acordo coletivo e nossa IA verifica a conformidade com a Lei 10.101/2000, 
-              gerando um relatório jurídico completo em segundos.
+              Envie o acordo coletivo e nossa IA analisa a conformidade com a Lei 10.101/2000,
+              verificando todas as formalidades legais com base na jurisprudência do CARF, TST e TRFs.
             </p>
           </div>
         </div>
@@ -236,13 +299,12 @@ export default function PLRAnalyzer() {
         {/* Upload Section */}
         {step === "upload" && (
           <div style={{ marginTop: "-40px" }}>
-            {/* Main upload */}
             <div style={{
               background: "#fff",
               borderRadius: "4px",
               boxShadow: "0 4px 24px rgba(10,22,40,0.12)",
               padding: "40px",
-              marginBottom: "24px",
+              marginBottom: "32px",
               border: "1px solid #E8E2D9"
             }}>
               <h2 style={{ color: "#0A1628", fontSize: "16px", fontWeight: "700", margin: "0 0 8px", letterSpacing: "1px" }}>
@@ -288,60 +350,6 @@ export default function PLRAnalyzer() {
               </div>
             </div>
 
-            {/* Memorandos upload */}
-            <div style={{
-              background: "#fff",
-              borderRadius: "4px",
-              border: "1px solid #E8E2D9",
-              padding: "32px 40px",
-              marginBottom: "32px",
-            }}>
-              <h2 style={{ color: "#0A1628", fontSize: "16px", fontWeight: "700", margin: "0 0 6px", letterSpacing: "1px" }}>
-                MEMORANDOS DE REFERÊNCIA <span style={{ color: "#9CA3AF", fontSize: "12px", fontWeight: "400" }}>(opcional)</span>
-              </h2>
-              <p style={{ color: "#6B7280", fontSize: "13px", margin: "0 0 20px", lineHeight: 1.6 }}>
-                Alimente a IA com memorandos do escritório para calibrar o padrão de análise e linguagem jurídica
-              </p>
-              <div
-                onDrop={handleMemoDrop}
-                onDragOver={(e) => { e.preventDefault(); setDragMemo(true); }}
-                onDragLeave={() => setDragMemo(false)}
-                onClick={() => document.getElementById("memo-input").click()}
-                style={{
-                  border: `2px dashed ${dragMemo ? "#B8962E" : "#E8E2D9"}`,
-                  borderRadius: "4px",
-                  padding: "28px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  background: dragMemo ? "rgba(184,150,46,0.04)" : "#FAFAF8",
-                  transition: "all 0.2s",
-                }}>
-                <input id="memo-input" type="file" multiple accept=".pdf,.doc,.docx,.txt" style={{ display: "none" }}
-                  onChange={(e) => setMemorandos(prev => [...prev, ...Array.from(e.target.files)])} />
-                <div style={{ color: "#6B7280", fontSize: "13px" }}>
-                  📎 Arraste múltiplos arquivos ou clique aqui
-                </div>
-              </div>
-              {memorandos.length > 0 && (
-                <div style={{ marginTop: "16px", display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                  {memorandos.map((m, i) => (
-                    <span key={i} style={{
-                      background: "#F5F2EC", border: "1px solid #D1C9BB",
-                      borderRadius: "20px", padding: "4px 12px",
-                      fontSize: "12px", color: "#0A1628",
-                      display: "flex", alignItems: "center", gap: "6px"
-                    }}>
-                      {m.name}
-                      <button onClick={(e) => { e.stopPropagation(); setMemorandos(prev => prev.filter((_, j) => j !== i)); }}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: "#9CA3AF", fontSize: "14px", padding: 0, lineHeight: 1 }}>
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {error && (
               <div style={{ background: "#FEE2E2", border: "1px solid #FCA5A5", borderRadius: "4px", padding: "16px 20px", marginBottom: "24px", color: "#991B1B", fontSize: "14px" }}>
                 ⚠ {error}
@@ -385,7 +393,7 @@ export default function PLRAnalyzer() {
               Analisando o acordo...
             </h3>
             <p style={{ color: "#6B7280", fontSize: "14px", lineHeight: 1.7 }}>
-              A IA está verificando cada cláusula em face da Lei 10.101/2000.<br/>
+              Verificando cada cláusula contra a Lei 10.101/2000, jurisprudência do CARF e tribunais.<br/>
               Isso pode levar alguns instantes.
             </p>
           </div>
@@ -491,6 +499,21 @@ export default function PLRAnalyzer() {
                           {cfg.icon} {aspecto.status}
                         </span>
                       </div>
+                      {/* Risk badges */}
+                      {(aspecto.riscoTrabalhista || aspecto.riscoPrevidenciario) && (
+                        <div style={{ display: "flex", gap: "12px", marginBottom: "12px", flexWrap: "wrap" }}>
+                          {aspecto.riscoTrabalhista && (
+                            <span style={{ fontSize: "10px", letterSpacing: "0.5px", padding: "3px 10px", borderRadius: "2px", background: "#F0F4FF", color: "#1E40AF", border: "1px solid #BFDBFE" }}>
+                              TRAB: {aspecto.riscoTrabalhista}
+                            </span>
+                          )}
+                          {aspecto.riscoPrevidenciario && (
+                            <span style={{ fontSize: "10px", letterSpacing: "0.5px", padding: "3px 10px", borderRadius: "2px", background: "#FFF7ED", color: "#9A3412", border: "1px solid #FED7AA" }}>
+                              PREV/TRIB: {aspecto.riscoPrevidenciario}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>
                         {aspecto.analise}
                       </p>
@@ -499,6 +522,29 @@ export default function PLRAnalyzer() {
                 })}
               </div>
             </div>
+
+            {/* Pontos de Atenção */}
+            {result.pontosDeAtencao?.length > 0 && (
+              <div style={{
+                background: "#FFFBEB",
+                borderRadius: "4px",
+                border: "1px solid #FCD34D",
+                padding: "28px 36px",
+                marginBottom: "24px",
+              }}>
+                <h3 style={{ color: "#92400E", fontSize: "13px", letterSpacing: "3px", margin: "0 0 16px" }}>
+                  ⚠ PONTOS DE ATENÇÃO — CONFIRMAR COM O CLIENTE
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {result.pontosDeAtencao.map((ponto, i) => (
+                    <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                      <span style={{ color: "#B8962E", fontWeight: "700", fontSize: "13px", minWidth: "16px" }}>•</span>
+                      <p style={{ color: "#78350F", fontSize: "14px", lineHeight: 1.65, margin: 0 }}>{ponto}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Conclusão */}
             <div style={{
@@ -545,7 +591,7 @@ export default function PLRAnalyzer() {
               </div>
             </div>
 
-            {/* Footer do relatório */}
+            {/* Footer */}
             <div style={{
               borderTop: "1px solid #D1C9BB",
               paddingTop: "24px",
@@ -567,7 +613,6 @@ export default function PLRAnalyzer() {
               </div>
             </div>
 
-            {/* Nova análise */}
             <button onClick={reset} style={{
               width: "100%",
               padding: "14px",
