@@ -266,7 +266,7 @@ export default function PLRAnalyzer() {
         top: 0,
         zIndex: 100,
       }}>
-        <MM_LOGO height={60} />
+        <MM_LOGO height={100} />
         <div style={{ textAlign: "right" }}>
           <div style={{ color: "#0A1628", fontSize: "11px", letterSpacing: "3px", marginBottom: "2px", fontWeight: "600" }}>ÁREA TRABALHISTA</div>
           <div style={{ color: "#6B7280", fontSize: "13px", letterSpacing: "1px" }}>Analisador de Compliance PLR</div>
