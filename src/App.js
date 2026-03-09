@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 // ─── Machado Meyer Brand Colors ───────────────────────────────────────────────
 // Navy: #0A1628  Gold: #B8962E  Light: #F5F2EC  Gray: #6B7280
 
-const MM_LOGO = ({ height = 44 }) => (
+const MM_LOGO = ({ height = 80 }) => (
   <img
     src={process.env.PUBLIC_URL + "/mm-logo.png"}
     alt="Machado Meyer"
