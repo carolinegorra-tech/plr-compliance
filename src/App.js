@@ -254,9 +254,9 @@ export default function PLRAnalyzer() {
     }}>
       {/* Header */}
       <header style={{
-        background: "#0A1628",
-        borderBottom: "3px solid #FFD600",
-        padding: "20px 48px",
+        background: "#FFFFFF",
+        borderBottom: "4px solid #FFD600",
+        padding: "16px 48px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -264,10 +264,10 @@ export default function PLRAnalyzer() {
         top: 0,
         zIndex: 100,
       }}>
-        <MM_LOGO />
+        <MM_LOGO height={60} />
         <div style={{ textAlign: "right" }}>
-          <div style={{ color: "#B8962E", fontSize: "11px", letterSpacing: "3px", marginBottom: "2px" }}>ÁREA TRABALHISTA</div>
-          <div style={{ color: "#fff", fontSize: "13px", letterSpacing: "1px" }}>Analisador de Compliance PLR</div>
+          <div style={{ color: "#0A1628", fontSize: "11px", letterSpacing: "3px", marginBottom: "2px", fontWeight: "600" }}>ÁREA TRABALHISTA</div>
+          <div style={{ color: "#6B7280", fontSize: "13px", letterSpacing: "1px" }}>Analisador de Compliance PLR</div>
         </div>
       </header>
 
