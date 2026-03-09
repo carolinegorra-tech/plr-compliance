@@ -391,7 +391,7 @@ export default function PLRAnalyzer() {
                 margin: "0 auto"
               }}/>
             </div>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } } @media print { header, button, .no-print { display: none !important; } body { background: white !important; } }`}</style>
             <h3 style={{ color: "#0A1628", fontSize: "20px", fontWeight: "400", margin: "0 0 12px" }}>
               Analisando o acordo...
             </h3>
@@ -629,7 +629,7 @@ export default function PLRAnalyzer() {
                 letterSpacing: "2px",
                 cursor: "pointer",
               }}>
-                EXPORTAR PDF ↓
+                EXPORTAR PDF
               </button>
               <button onClick={reset} style={{
                 flex: 1,
@@ -643,16 +643,9 @@ export default function PLRAnalyzer() {
                 letterSpacing: "2px",
                 cursor: "pointer",
               }}>
-                ← NOVA ANÁLISE
+                NOVA ANÁLISE
               </button>
             </div>
-            <style>{`
-              @media print {
-                header, button { display: none !important; }
-                body { background: white !important; }
-                div[style*="sticky"] { position: relative !important; }
-              }
-            `}</style>
           </div>
         )}
       </div>
