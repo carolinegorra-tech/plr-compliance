@@ -292,11 +292,11 @@ export default function PLRAnalyzer() {
         </div>
       )}
 
-      <div style={{ maxWidth: "860px", margin: "0 auto", padding: step === "result" ? "40px 24px" : "-40px 24px 60px" }}>
+      <div style={{ maxWidth: "860px", margin: "0 auto", padding: step === "result" ? "40px 24px" : "40px 24px 60px" }}>
 
         {/* Upload Section */}
         {step === "upload" && (
-          <div style={{ marginTop: "-40px" }}>
+          <div style={{ marginTop: "0" }}>
             <div style={{
               background: "#fff",
               borderRadius: "4px",
