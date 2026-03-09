@@ -616,20 +616,43 @@ export default function PLRAnalyzer() {
               </div>
             </div>
 
-            <button onClick={reset} style={{
-              width: "100%",
-              padding: "14px",
-              background: "transparent",
-              color: "#0A1628",
-              border: "2px solid #0A1628",
-              borderRadius: "4px",
-              fontSize: "13px",
-              fontFamily: "'Georgia', serif",
-              letterSpacing: "2px",
-              cursor: "pointer",
-            }}>
-              ← NOVA ANÁLISE
-            </button>
+            <div style={{ display: "flex", gap: "12px" }}>
+              <button onClick={() => window.print()} style={{
+                flex: 1,
+                padding: "14px",
+                background: "#B8962E",
+                color: "#fff",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "13px",
+                fontFamily: "'Georgia', serif",
+                letterSpacing: "2px",
+                cursor: "pointer",
+              }}>
+                EXPORTAR PDF ↓
+              </button>
+              <button onClick={reset} style={{
+                flex: 1,
+                padding: "14px",
+                background: "transparent",
+                color: "#0A1628",
+                border: "2px solid #0A1628",
+                borderRadius: "4px",
+                fontSize: "13px",
+                fontFamily: "'Georgia', serif",
+                letterSpacing: "2px",
+                cursor: "pointer",
+              }}>
+                ← NOVA ANÁLISE
+              </button>
+            </div>
+            <style>{`
+              @media print {
+                header, button { display: none !important; }
+                body { background: white !important; }
+                div[style*="sticky"] { position: relative !important; }
+              }
+            `}</style>
           </div>
         )}
       </div>
