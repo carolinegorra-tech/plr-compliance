@@ -3,14 +3,12 @@ import { useState, useCallback } from "react";
 // ─── Machado Meyer Brand Colors ───────────────────────────────────────────────
 // Navy: #0A1628  Gold: #B8962E  Light: #F5F2EC  Gray: #6B7280
 
-const MM_LOGO = () => (
-  <svg width="220" height="48" viewBox="0 0 220 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="6" height="48" fill="#B8962E"/>
-    <rect x="10" width="6" height="48" fill="#B8962E"/>
-    <text x="26" y="20" fontFamily="'Georgia', serif" fontSize="15" fontWeight="700" fill="#0A1628" letterSpacing="2">MACHADO MEYER</text>
-    <text x="26" y="36" fontFamily="'Georgia', serif" fontSize="9" fill="#B8962E" letterSpacing="3">ADVOGADOS</text>
-    <line x1="26" y1="40" x2="220" y2="40" stroke="#B8962E" strokeWidth="0.5"/>
-  </svg>
+const MM_LOGO = ({ height = 44 }) => (
+  <img
+    src={process.env.PUBLIC_URL + "/mm-logo.png"}
+    alt="Machado Meyer"
+    style={{ height, objectFit: "contain" }}
+  />
 );
 
 // ─── System Prompt (knowledge from firm's reference memos baked in) ───────────
@@ -257,7 +255,7 @@ export default function PLRAnalyzer() {
       {/* Header */}
       <header style={{
         background: "#0A1628",
-        borderBottom: "3px solid #B8962E",
+        borderBottom: "3px solid #FFD600",
         padding: "20px 48px",
         display: "flex",
         alignItems: "center",
