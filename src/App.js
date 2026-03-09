@@ -192,17 +192,33 @@ export default function PLRAnalyzer() {
 
     try {
       const isPDF = file.type === "application/pdf";
+      const isWord = file.name.endsWith(".docx") || file.name.endsWith(".doc");
       let userContent = [];
 
       if (isPDF) {
-        const b64 = await readFileAsBase64(file);
-        userContent.push({
-          type: "document",
-          source: { type: "base64", media_type: "application/pdf", data: b64 }
-        });
+        // Check file size - if under 5MB, send as PDF directly; if larger, extract text
+        if (file.size < 5 * 1024 * 1024) {
+          const b64 = await readFileAsBase64(file);
+          userContent.push({
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: b64 }
+          });
+        } else {
+          // For large PDFs, read as text and truncate
+          const text = await readFileAsText(file);
+          const truncated = text.substring(0, 500000);
+          userContent.push({
+            type: "text",
+            text: `ACORDO COLETIVO DE PLR (documento grande - texto extraído):\n\n${truncated}${text.length > 500000 ? "\n\n[... DOCUMENTO TRUNCADO POR EXCEDER O LIMITE ...]" : ""}`
+          });
+        }
       } else {
         const text = await readFileAsText(file);
-        userContent.push({ type: "text", text: `ACORDO COLETIVO DE PLR:\n\n${text}` });
+        const truncated = text.substring(0, 500000);
+        userContent.push({
+          type: "text",
+          text: `ACORDO COLETIVO DE PLR:\n\n${truncated}${text.length > 500000 ? "\n\n[... DOCUMENTO TRUNCADO POR EXCEDER O LIMITE ...]" : ""}`
+        });
       }
 
       userContent.push({
