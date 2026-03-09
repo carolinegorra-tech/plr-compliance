@@ -5,7 +5,7 @@ import { useState, useCallback } from "react";
 
 const MM_LOGO = ({ height = 80 }) => (
   <img
-    src={process.env.PUBLIC_URL + "/mm-logo.png"}
+    src={process.env.PUBLIC_URL + "/mm-logo2.png"}
     alt="Machado Meyer"
     style={{ height, objectFit: "contain" }}
   />
