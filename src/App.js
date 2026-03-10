@@ -437,22 +437,21 @@ export default function PLRAnalyzer() {
               borderRadius: "4px",
               padding: "48px",
               marginBottom: "32px",
-              position: "relative",
-              overflow: "hidden",
             }}>
-              <div style={{ position: "absolute", top: 0, right: 0, width: "200px", height: "100%", background: "rgba(184,150,46,0.06)" }}/>
-              <div style={{ position: "absolute", top: "20px", right: "48px" }}>
-                <MM_LOGO />
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px" }}>
+                <div>
+                  <div style={{ color: "#B8962E", fontSize: "10px", letterSpacing: "4px", marginBottom: "12px" }}>
+                    RELATÓRIO DE ANÁLISE JURÍDICA
+                  </div>
+                  <h1 style={{ color: "#F5F2EC", fontSize: "32px", fontWeight: "400", margin: "0 0 8px" }}>
+                    Compliance Legal
+                  </h1>
+                  <h2 style={{ color: "#B8962E", fontSize: "18px", fontWeight: "400", margin: 0 }}>
+                    Acordo Coletivo de PLR · Lei 10.101/2000
+                  </h2>
+                </div>
+                <MM_LOGO height={70} />
               </div>
-              <div style={{ color: "#B8962E", fontSize: "10px", letterSpacing: "4px", marginBottom: "12px" }}>
-                RELATÓRIO DE ANÁLISE JURÍDICA
-              </div>
-              <h1 style={{ color: "#F5F2EC", fontSize: "32px", fontWeight: "400", margin: "0 0 8px" }}>
-                Compliance Legal
-              </h1>
-              <h2 style={{ color: "#B8962E", fontSize: "18px", fontWeight: "400", margin: "0 0 32px" }}>
-                Acordo Coletivo de PLR · Lei 10.101/2000
-              </h2>
 
               {/* Score + Risk */}
               <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
