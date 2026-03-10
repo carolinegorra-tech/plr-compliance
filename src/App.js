@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import * as mammoth from "mammoth";
 
 // ─── Machado Meyer Brand Colors ───────────────────────────────────────────────
 // Navy: #0A1628  Gold: #B8962E  Light: #F5F2EC  Gray: #6B7280
@@ -177,6 +178,31 @@ export default function PLRAnalyzer() {
     r.readAsText(f);
   });
 
+  const readDocxAsText = (f) => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        const result = await mammoth.extractRawText({ arrayBuffer: r.result });
+        res(result.value);
+      } catch (e) { rej(e); }
+    };
+    r.onerror = rej;
+    r.readAsArrayBuffer(f);
+  });
+
+  const readFileContent = async (f) => {
+    const name = f.name.toLowerCase();
+    if (name.endsWith(".docx") || name.endsWith(".doc")) {
+      return await readDocxAsText(f);
+    }
+    if (f.type === "application/pdf") {
+      // PDFs: send as base64 document for best quality
+      const b64 = await readFileAsBase64(f);
+      return { isPDF: true, b64 };
+    }
+    return await readFileAsText(f);
+  };
+
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     setDragOver(false);
@@ -192,13 +218,24 @@ export default function PLRAnalyzer() {
 
     try {
       let userContent = [];
-      const text = await readFileAsText(file);
-      const maxChars = 400000;
-      const truncated = text.substring(0, maxChars);
-      userContent.push({
-        type: "text",
-        text: `ACORDO COLETIVO DE PLR:\n\n${truncated}${text.length > maxChars ? "\n\n[... DOCUMENTO TRUNCADO POR EXCEDER O LIMITE ...]" : ""}`
-      });
+      const content = await readFileContent(file);
+
+      if (content && content.isPDF) {
+        // Send PDF as document
+        userContent.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: content.b64 }
+        });
+      } else {
+        // Text content (from DOCX, TXT, or other)
+        const text = typeof content === "string" ? content : "";
+        const maxChars = 400000;
+        const truncated = text.substring(0, maxChars);
+        userContent.push({
+          type: "text",
+          text: `ACORDO COLETIVO DE PLR:\n\n${truncated}${text.length > maxChars ? "\n\n[... DOCUMENTO TRUNCADO POR EXCEDER O LIMITE ...]" : ""}`
+        });
+      }
 
       userContent.push({
         type: "text",
