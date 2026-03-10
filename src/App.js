@@ -197,7 +197,7 @@ export default function PLRAnalyzer() {
 
       if (isPDF) {
         // Check file size - if under 5MB, send as PDF directly; if larger, extract text
-        if (file.size < 5 * 1024 * 1024) {
+        if (file.size < 1 * 1024 * 1024) {
           const b64 = await readFileAsBase64(file);
           userContent.push({
             type: "document",
@@ -677,3 +677,4 @@ export default function PLRAnalyzer() {
     </div>
   );
 }
+
