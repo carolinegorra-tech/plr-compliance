@@ -86,7 +86,14 @@ g) DATA DE ASSINATURA
 
 h) METAS CLARAS E OBJETIVAS
    - Refs: CARF Ac. 2402-05.508; CARF Ac. 2401-004.365
-   - SCORE: 0 a 100 baseado na sua análise aprofundada. Justifique.
+   - SCORE — use esta rubrica ESTRITA:
+     * 90-100: TODAS as metas (corporativas, área, individuais) são 100% quantificáveis com indicadores numéricos objetivos (ex: EBITDA > X, inadimplência < Y%). Zero subjetividade.
+     * 70-89: Metas corporativas são objetivas MAS há algum elemento subjetivo menor (ex: avaliação comportamental com peso pequeno, metas de área sem indicador numérico claro).
+     * 50-69: Mistura significativa de critérios objetivos e subjetivos. Inclui: curva forçada, avaliação de desempenho individual subjetiva, metas de diretoria genéricas sem KPI, ou termos vagos como "contribuição", "comprometimento", "alinhamento cultural".
+     * 30-49: Maioria dos critérios são subjetivos ou vagos. Metas corporativas existem mas o cálculo individual depende fortemente de avaliação discricionária.
+     * 0-29: Metas essencialmente subjetivas, sem indicadores mensuráveis. Distribuição por liberalidade.
+   - REGRA HARD: Se identificou "curva forçada" ou avaliação individual subjetiva com peso relevante no cálculo, o score NÃO PODE ser superior a 65.
+   - Justifique o score com referência específica às cláusulas do acordo.
 
 i) PAGAMENTO A DIRETORES ESTATUTÁRIOS
    - Refs: CSRF Ac. 9202-004.347; CSRF Ac. 9202-004.305
@@ -96,6 +103,7 @@ CÁLCULO DO SCORE:
 1. Se QUALQUER item objetivo = 0 → score final trabalhista E tributário = 0
 2. Se todos objetivos = 100 → score de nuance = média(Data de Assinatura + Metas) ± Diretores
 3. Score final = score de nuance
+4. MOSTRE O CÁLCULO: no campo "conclusaoTrabalhista", inclua uma linha com: "Score de nuance: (Data [X] + Metas [Y]) / 2 [± Diretores] = Z"
 
 ESCALA DE RISCO:
 - REMOTO — risco muito baixo
