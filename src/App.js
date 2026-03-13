@@ -142,7 +142,7 @@ FORMATO DE RESPOSTA — APENAS JSON válido, sem markdown:
   "classificacaoPrevidenciario": "ALTO RISCO"/"RISCO MODERADO"/"BAIXO RISCO"/"CONFORME"
 }`;
 
-// ─── Load pptxgenjs from CDN (no npm install needed) ─────────────────────────
+// ─── Load pptxgenjs from CDN ─────────────────────────────────────────────────
 function loadPptxGen() {
   return new Promise((resolve, reject) => {
     if (window.PptxGenJS) return resolve(window.PptxGenJS);
@@ -168,7 +168,7 @@ async function generatePPTX(result) {
   const dt = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const bar = (sl) => sl.addShape(pres.shapes.RECTANGLE, { x: 0, y: 5.45, w: 10, h: 0.175, fill: { color: P.GD } });
 
-  // S1: Title
+  // ── S1: Title ──
   const s1 = pres.addSlide(); s1.background = { color: P.NV };
   s1.addShape(pres.shapes.RECTANGLE, { x: 8.2, y: 0, w: 0.01, h: 5.625, fill: { color: P.GD, transparency: 80 } });
   s1.addShape(pres.shapes.RECTANGLE, { x: 9.0, y: 0, w: 0.01, h: 5.625, fill: { color: P.GD, transparency: 90 } });
@@ -184,7 +184,7 @@ async function generatePPTX(result) {
   ], { x: 0.8, y: 4.6, w: 6, h: 0.7, valign: "bottom" });
   bar(s1);
 
-  // S2: Scores
+  // ── S2: Scores ──
   const s2 = pres.addSlide(); s2.background = { color: P.NV };
   s2.addText("RESULTADO DA ANÁLISE", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: P.GD, charSpacing: 4, fontFace: "Calibri" });
   s2.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.85, w: 1.5, h: 0.03, fill: { color: P.GD } });
@@ -210,77 +210,126 @@ async function generatePPTX(result) {
   });
   bar(s2);
 
-  // Aspects (3 per slide)
+  // ── Aspects: 1 per slide with FULL text ──
   const aspects = result.aspectos || [];
-  for (let b = 0; b < aspects.length; b += 3) {
-    const batch = aspects.slice(b, b + 3);
+  aspects.forEach((a, aIdx) => {
     const sl = pres.addSlide(); sl.background = { color: P.CR };
-    sl.addText(b === 0 ? "ANÁLISE POR ASPECTOS" : "ANÁLISE POR ASPECTOS (CONT.)", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: P.NV, charSpacing: 3, bold: true, fontFace: "Calibri" });
-    sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.8, h: 0.03, fill: { color: P.GD } });
-    batch.forEach((a, idx) => {
-      const cy = 1.0 + idx * 1.5;
-      const sc = stC(a.status);
-      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 8.8, h: 1.3, fill: { color: P.WH } });
-      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 0.06, h: 1.3, fill: { color: sc.tx } });
-      sl.addText(a.titulo || "", { x: 0.85, y: cy + 0.08, w: 5.5, h: 0.35, fontSize: 13, color: P.NV, bold: true, fontFace: "Georgia", margin: 0 });
-      sl.addShape(pres.shapes.RECTANGLE, { x: 6.5, y: cy + 0.1, w: 1.8, h: 0.28, fill: { color: sc.bg } });
-      sl.addText(sc.i + " " + a.status, { x: 6.5, y: cy + 0.1, w: 1.8, h: 0.28, fontSize: 8, color: sc.tx, bold: true, align: "center", valign: "middle", charSpacing: 1, fontFace: "Calibri" });
-      if (a.scoreItem !== undefined) sl.addText("Score: " + a.scoreItem + "/100", { x: 8.4, y: cy + 0.1, w: 0.9, h: 0.28, fontSize: 9, color: P.GD, bold: true, align: "right", valign: "middle", fontFace: "Calibri", margin: 0 });
-      if (a.fundamento) sl.addText(a.fundamento, { x: 0.85, y: cy + 0.4, w: 8.4, h: 0.25, fontSize: 8, color: P.GR, fontFace: "Calibri", margin: 0 });
-      const txt = (a.analiseTrabalhista || "").substring(0, 200);
-      sl.addText(txt + (txt.length >= 200 ? "..." : ""), { x: 0.85, y: cy + 0.65, w: 8.4, h: 0.55, fontSize: 9, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
-      if (a.riscoTrabalhista) sl.addText("TRAB: " + a.riscoTrabalhista, { x: 0.85, y: cy + 1.08, w: 2.2, h: 0.2, fontSize: 7, color: P.YT, bold: true, fontFace: "Calibri", margin: 0 });
-      if (a.riscoPrevidenciario && !a.apenasTrabalista) sl.addText("PREV: " + a.riscoPrevidenciario, { x: 3.2, y: cy + 1.08, w: 2.2, h: 0.2, fontSize: 7, color: P.RT, bold: true, fontFace: "Calibri", margin: 0 });
-    });
+    const sc = stC(a.status);
+
+    // Header
+    sl.addText("ANÁLISE POR ASPECTOS — " + (aIdx + 1) + "/" + aspects.length, { x: 0.6, y: 0.25, w: 8, h: 0.35, fontSize: 8, color: P.GR, charSpacing: 2, fontFace: "Calibri" });
+
+    // Title bar
+    sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.6, w: 8.8, h: 0.55, fill: { color: P.NV } });
+    sl.addText(a.titulo || "", { x: 0.85, y: 0.6, w: 5.5, h: 0.55, fontSize: 14, color: P.CR, bold: true, fontFace: "Georgia", valign: "middle", margin: 0 });
+    // Status badge
+    sl.addShape(pres.shapes.RECTANGLE, { x: 6.5, y: 0.72, w: 1.8, h: 0.3, fill: { color: sc.bg } });
+    sl.addText(sc.i + " " + a.status, { x: 6.5, y: 0.72, w: 1.8, h: 0.3, fontSize: 8, color: sc.tx, bold: true, align: "center", valign: "middle", charSpacing: 1, fontFace: "Calibri" });
+    // Score
+    if (a.scoreItem !== undefined) {
+      sl.addText("Score: " + a.scoreItem + "/100", { x: 8.4, y: 0.72, w: 1.0, h: 0.3, fontSize: 10, color: P.GD, bold: true, align: "right", valign: "middle", fontFace: "Calibri", margin: 0 });
+    }
+
+    // Fundamento + risk badges row
+    let metaY = 1.25;
+    if (a.fundamento) {
+      sl.addText(a.fundamento, { x: 0.6, y: metaY, w: 5, h: 0.25, fontSize: 8, color: P.GR, fontFace: "Calibri", margin: 0 });
+    }
+    if (a.riscoTrabalhista) {
+      sl.addShape(pres.shapes.RECTANGLE, { x: 5.8, y: metaY, w: 2.0, h: 0.25, fill: { color: P.YB } });
+      sl.addText("TRAB: " + a.riscoTrabalhista, { x: 5.8, y: metaY, w: 2.0, h: 0.25, fontSize: 7, color: P.YT, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
+    }
+    if (a.riscoPrevidenciario && !a.apenasTrabalista) {
+      sl.addShape(pres.shapes.RECTANGLE, { x: 7.9, y: metaY, w: 1.5, h: 0.25, fill: { color: P.RB } });
+      sl.addText("PREV: " + a.riscoPrevidenciario, { x: 7.9, y: metaY, w: 1.5, h: 0.25, fontSize: 7, color: P.RT, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
+    }
+
+    // Analysis content area - FULL TEXT
+    let cy = 1.65;
+    if (a.analiseTrabalhista) {
+      const hasPrevi = a.analisePrevidenciario && !a.apenasTrabalista;
+      if (hasPrevi) {
+        sl.addText("ANÁLISE TRABALHISTA", { x: 0.6, y: cy, w: 8, h: 0.25, fontSize: 8, color: P.BT, bold: true, charSpacing: 1, fontFace: "Calibri", margin: 0 });
+        cy += 0.3;
+      }
+      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 8.8, h: hasPrevi ? 1.5 : 3.2, fill: { color: P.WH } });
+      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 0.05, h: hasPrevi ? 1.5 : 3.2, fill: { color: "3B82F6" } });
+      sl.addText(a.analiseTrabalhista, { x: 0.85, y: cy + 0.08, w: 8.35, h: hasPrevi ? 1.35 : 3.05, fontSize: 10, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
+      cy += hasPrevi ? 1.6 : 3.3;
+    }
+    if (a.analisePrevidenciario && !a.apenasTrabalista) {
+      sl.addText("ANÁLISE TRIBUTÁRIA / PREVIDENCIÁRIA", { x: 0.6, y: cy, w: 8, h: 0.25, fontSize: 8, color: "9A3412", bold: true, charSpacing: 1, fontFace: "Calibri", margin: 0 });
+      cy += 0.3;
+      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 8.8, h: 1.5, fill: { color: P.WH } });
+      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 0.05, h: 1.5, fill: { color: "F97316" } });
+      sl.addText(a.analisePrevidenciario, { x: 0.85, y: cy + 0.08, w: 8.35, h: 1.35, fontSize: 10, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
+    }
     bar(sl);
-  }
+  });
 
-  // Conclusions
-  const sc = pres.addSlide(); sc.background = { color: P.CR };
-  sc.addText("CONCLUSÃO", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: P.NV, charSpacing: 3, bold: true, fontFace: "Calibri" });
-  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.2, h: 0.03, fill: { color: P.GD } });
-  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 1.0, w: 8.8, h: 2.0, fill: { color: P.WH } });
-  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 1.0, w: 0.06, h: 2.0, fill: { color: "3B82F6" } });
-  sc.addText("CONCLUSÃO — ÁREA TRABALHISTA", { x: 0.85, y: 1.05, w: 8, h: 0.3, fontSize: 8, color: P.BT, bold: true, charSpacing: 2, fontFace: "Calibri", margin: 0 });
-  sc.addText((result.conclusaoTrabalhista || "").substring(0, 500), { x: 0.85, y: 1.35, w: 8.3, h: 1.55, fontSize: 9, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
-  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 3.2, w: 8.8, h: 2.0, fill: { color: P.WH } });
-  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 3.2, w: 0.06, h: 2.0, fill: { color: "F97316" } });
-  sc.addText("CONCLUSÃO — ÁREA TRIBUTÁRIA / PREVIDENCIÁRIA", { x: 0.85, y: 3.25, w: 8, h: 0.3, fontSize: 8, color: "9A3412", bold: true, charSpacing: 2, fontFace: "Calibri", margin: 0 });
-  sc.addText((result.conclusaoPrevidenciario || "").substring(0, 500), { x: 0.85, y: 3.55, w: 8.3, h: 1.55, fontSize: 9, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
-  bar(sc);
+  // ── Conclusion Trabalhista — full slide ──
+  const sc1 = pres.addSlide(); sc1.background = { color: P.CR };
+  sc1.addText("CONCLUSÃO — ÁREA TRABALHISTA", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: P.BT, charSpacing: 3, bold: true, fontFace: "Calibri" });
+  sc1.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.8, h: 0.03, fill: { color: "3B82F6" } });
+  sc1.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.95, w: 8.8, h: 4.2, fill: { color: P.WH } });
+  sc1.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.95, w: 0.06, h: 4.2, fill: { color: "3B82F6" } });
+  sc1.addText(result.conclusaoTrabalhista || "", { x: 0.85, y: 1.05, w: 8.35, h: 4.0, fontSize: 10, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
+  bar(sc1);
 
-  // Recommendations
+  // ── Conclusion Previdenciária — full slide ──
+  const sc2 = pres.addSlide(); sc2.background = { color: P.CR };
+  sc2.addText("CONCLUSÃO — ÁREA TRIBUTÁRIA / PREVIDENCIÁRIA", { x: 0.6, y: 0.3, w: 9, h: 0.4, fontSize: 10, color: "9A3412", charSpacing: 3, bold: true, fontFace: "Calibri" });
+  sc2.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.8, h: 0.03, fill: { color: "F97316" } });
+  sc2.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.95, w: 8.8, h: 4.2, fill: { color: P.WH } });
+  sc2.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.95, w: 0.06, h: 4.2, fill: { color: "F97316" } });
+  sc2.addText(result.conclusaoPrevidenciario || "", { x: 0.85, y: 1.05, w: 8.35, h: 4.0, fontSize: 10, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
+  bar(sc2);
+
+  // ── Recommendations — full text ──
   if (result.recomendacoes?.length) {
     const sr = pres.addSlide(); sr.background = { color: P.NV };
     sr.addText("RECOMENDAÇÕES", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: P.GD, charSpacing: 3, bold: true, fontFace: "Calibri" });
     sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.82, w: 1.5, h: 0.03, fill: { color: P.GD } });
+    const recPerSlide = 4;
     result.recomendacoes.forEach((rec, i) => {
-      const ry = 1.2 + i * 0.85;
-      if (ry + 0.7 > 5.2) return;
-      sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: ry, w: 0.45, h: 0.45, fill: { color: P.GD } });
-      sr.addText(String(i + 1).padStart(2, "0"), { x: 0.8, y: ry, w: 0.45, h: 0.45, fontSize: 12, color: P.NV, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
-      sr.addText((rec.length > 180 ? rec.substring(0, 177) + "..." : rec), { x: 1.5, y: ry + 0.02, w: 7.8, h: 0.45, fontSize: 11, color: P.CR, fontFace: "Calibri", valign: "middle", margin: 0 });
+      if (i > 0 && i % recPerSlide === 0) {
+        bar(sr);
+        const sr2 = pres.addSlide(); sr2.background = { color: P.NV };
+        sr2.addText("RECOMENDAÇÕES (CONT.)", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: P.GD, charSpacing: 3, bold: true, fontFace: "Calibri" });
+        sr2.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.82, w: 1.5, h: 0.03, fill: { color: P.GD } });
+      }
+      const ry = 1.2 + (i % recPerSlide) * 1.0;
+      const slide = pres.slides[pres.slides.length - 1];
+      slide.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: ry, w: 0.45, h: 0.45, fill: { color: P.GD } });
+      slide.addText(String(i + 1).padStart(2, "0"), { x: 0.8, y: ry, w: 0.45, h: 0.45, fontSize: 12, color: P.NV, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
+      slide.addText(rec, { x: 1.5, y: ry, w: 7.8, h: 0.85, fontSize: 10, color: P.CR, fontFace: "Calibri", valign: "top", margin: 0 });
     });
-    bar(sr);
+    bar(pres.slides[pres.slides.length - 1]);
   }
 
-  // Pontos de Atenção
+  // ── Pontos de Atenção — full text ──
   if (result.pontosDeAtencao?.length) {
     const sp = pres.addSlide(); sp.background = { color: "FFFBEB" };
     sp.addText("PONTOS DE ATENÇÃO — CONFIRMAR COM O CLIENTE", { x: 0.6, y: 0.4, w: 9, h: 0.4, fontSize: 10, color: P.YT, charSpacing: 2, bold: true, fontFace: "Calibri" });
     sp.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.82, w: 2.5, h: 0.03, fill: { color: P.GD } });
     result.pontosDeAtencao.forEach((pt, i) => {
-      const py = 1.2 + i * 0.75;
-      if (py + 0.6 > 5.2) return;
-      sp.addText([
+      if (i > 0 && i % 4 === 0) {
+        bar(sp);
+        const sp2 = pres.addSlide(); sp2.background = { color: "FFFBEB" };
+        sp2.addText("PONTOS DE ATENÇÃO (CONT.)", { x: 0.6, y: 0.4, w: 9, h: 0.4, fontSize: 10, color: P.YT, charSpacing: 2, bold: true, fontFace: "Calibri" });
+        sp2.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.82, w: 2.5, h: 0.03, fill: { color: P.GD } });
+      }
+      const py = 1.1 + (i % 4) * 1.0;
+      const slide = pres.slides[pres.slides.length - 1];
+      slide.addText([
         { text: "•  ", options: { fontSize: 14, color: P.GD, bold: true } },
-        { text: (pt.length > 200 ? pt.substring(0, 197) + "..." : pt), options: { fontSize: 11, color: "78350F" } }
-      ], { x: 0.7, y: py, w: 8.5, h: 0.6, fontFace: "Calibri", valign: "top", margin: 0 });
+        { text: pt, options: { fontSize: 10, color: "78350F" } }
+      ], { x: 0.7, y: py, w: 8.5, h: 0.9, fontFace: "Calibri", valign: "top", margin: 0 });
     });
-    bar(sp);
+    bar(pres.slides[pres.slides.length - 1]);
   }
 
-  // Closing
+  // ── Closing ──
   const se = pres.addSlide(); se.background = { color: P.NV };
   se.addShape(pres.shapes.RECTANGLE, { x: 3.5, y: 1.8, w: 0.06, h: 0.8, fill: { color: P.GD } });
   se.addText([
