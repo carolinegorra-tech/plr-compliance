@@ -1,12 +1,11 @@
 import { useState, useCallback } from "react";
 import * as mammoth from "mammoth";
+import pptxgen from "pptxgenjs";
 
-// ─── Machado Meyer Brand Colors ───────────────────────────────────────────────
 const MM_LOGO = ({ height = 100 }) => (
   <img src={process.env.PUBLIC_URL + "/mm-logo.png"} alt="Machado Meyer Advogados" style={{ height, objectFit: "contain" }} />
 );
 
-// ─── System Prompt ────────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `Você é um assistente jurídico especializado em análise de compliance de Programas de Participação nos Lucros ou Resultados (PLR) no Brasil, atuando na área consultiva trabalhista de um escritório de advocacia de grande porte.
 
 Seu papel é analisar acordos de PLR enviados pelo usuário e produzir análises jurídicas completas, identificando riscos trabalhistas, previdenciários e tributários.
@@ -144,19 +143,157 @@ FORMATO DE RESPOSTA — APENAS JSON válido, sem markdown:
   "classificacaoPrevidenciario": "ALTO RISCO"/"RISCO MODERADO"/"BAIXO RISCO"/"CONFORME"
 }`;
 
+// ─── PPTX Colors ──────────────────────────────────────────────────────────────
+const C = { NAVY: "0A1628", GOLD: "B8962E", CREAM: "F5F2EC", WHITE: "FFFFFF", GRAY: "6B7280", DARK: "1E293B", G_BG: "DCFCE7", G_TX: "166534", R_BG: "FEE2E2", R_TX: "991B1B", Y_BG: "FEF3C7", Y_TX: "92400E", B_BG: "DBEAFE", B_TX: "1E40AF" };
+
+function stColor(s) { return s === "CONFORME" ? { bg: C.G_BG, tx: C.G_TX, i: "✓" } : s === "NÃO CONFORME" ? { bg: C.R_BG, tx: C.R_TX, i: "✗" } : { bg: C.Y_BG, tx: C.Y_TX, i: "◐" }; }
+function clColor(c) { return c === "CONFORME" ? { bg: C.G_BG, tx: C.G_TX } : c === "BAIXO RISCO" ? { bg: C.B_BG, tx: C.B_TX } : c === "ALTO RISCO" ? { bg: C.R_BG, tx: C.R_TX } : { bg: C.Y_BG, tx: C.Y_TX }; }
+
+async function generatePPTX(result) {
+  const pres = new pptxgen();
+  pres.layout = "LAYOUT_16x9";
+  pres.author = "Machado Meyer Advogados";
+  pres.title = "Análise de Compliance PLR";
+  const dt = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
+  const goldBar = (sl) => sl.addShape(pres.shapes.RECTANGLE, { x: 0, y: 5.45, w: 10, h: 0.175, fill: { color: C.GOLD } });
+
+  // ── S1: Title ──
+  const s1 = pres.addSlide(); s1.background = { color: C.NAVY };
+  s1.addShape(pres.shapes.RECTANGLE, { x: 8.2, y: 0, w: 0.01, h: 5.625, fill: { color: C.GOLD, transparency: 80 } });
+  s1.addShape(pres.shapes.RECTANGLE, { x: 9.0, y: 0, w: 0.01, h: 5.625, fill: { color: C.GOLD, transparency: 90 } });
+  s1.addText("INTELIGÊNCIA ARTIFICIAL · CONSULTORIA TRABALHISTA", { x: 0.8, y: 1.0, w: 8, h: 0.4, fontSize: 9, color: C.GOLD, charSpacing: 4, fontFace: "Calibri" });
+  s1.addText([
+    { text: "Análise de Compliance", options: { fontSize: 36, color: C.CREAM, fontFace: "Georgia", breakLine: true } },
+    { text: "Acordos Coletivos de PLR", options: { fontSize: 36, color: C.GOLD, fontFace: "Georgia" } }
+  ], { x: 0.8, y: 1.6, w: 8, h: 2, valign: "top" });
+  s1.addText("Lei nº 10.101/2000 · Jurisprudência CARF, TST e TRFs", { x: 0.8, y: 3.6, w: 8, h: 0.4, fontSize: 13, color: C.CREAM, fontFace: "Calibri" });
+  s1.addText([
+    { text: "MACHADO MEYER ADVOGADOS", options: { fontSize: 10, color: C.GOLD, bold: true, charSpacing: 2, breakLine: true, fontFace: "Calibri" } },
+    { text: "Área Trabalhista · " + dt, options: { fontSize: 10, color: C.GRAY, fontFace: "Calibri" } }
+  ], { x: 0.8, y: 4.6, w: 6, h: 0.7, valign: "bottom" });
+  goldBar(s1);
+
+  // ── S2: Scores ──
+  const s2 = pres.addSlide(); s2.background = { color: C.NAVY };
+  s2.addText("RESULTADO DA ANÁLISE", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: C.GOLD, charSpacing: 4, fontFace: "Calibri" });
+  s2.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.85, w: 1.5, h: 0.03, fill: { color: C.GOLD } });
+  const scores = [
+    { label: "SCORE TRABALHISTA", val: result.scoreTrabalhista, cls: result.classificacaoTrabalhista },
+    { label: "SCORE TRIBUTÁRIO / PREV.", val: result.scorePrevidenciario, cls: result.classificacaoPrevidenciario },
+  ];
+  if (result.scoreNuance !== undefined) scores.push({ label: "SCORE DE NUANCE", val: result.scoreNuance, cls: null });
+  const bW = scores.length === 3 ? 2.6 : 3.5, gp = scores.length === 3 ? 0.5 : 1.0;
+  const sX = (10 - (scores.length * bW + (scores.length - 1) * gp)) / 2;
+  scores.forEach((s, i) => {
+    const bx = sX + i * (bW + gp);
+    s2.addShape(pres.shapes.RECTANGLE, { x: bx, y: 1.3, w: bW, h: 3.0, fill: { color: "0F1F38" } });
+    s2.addText(s.label, { x: bx, y: 1.5, w: bW, h: 0.4, fontSize: 8, color: C.GRAY, align: "center", charSpacing: 2, fontFace: "Calibri" });
+    s2.addText(String(s.val), { x: bx, y: 2.0, w: bW, h: 1.2, fontSize: 54, color: C.GOLD, bold: true, align: "center", valign: "middle", fontFace: "Georgia" });
+    if (s.cls) {
+      const cc = clColor(s.cls);
+      s2.addShape(pres.shapes.RECTANGLE, { x: bx + bW * 0.15, y: 3.4, w: bW * 0.7, h: 0.4, fill: { color: cc.bg } });
+      s2.addText(s.cls, { x: bx + bW * 0.15, y: 3.4, w: bW * 0.7, h: 0.4, fontSize: 9, color: cc.tx, bold: true, align: "center", valign: "middle", charSpacing: 1, fontFace: "Calibri" });
+    } else {
+      s2.addText("Média: Data + Metas ± Diretores", { x: bx, y: 3.5, w: bW, h: 0.3, fontSize: 8, color: C.GRAY, align: "center", fontFace: "Calibri" });
+    }
+  });
+  goldBar(s2);
+
+  // ── Aspects (3 per slide) ──
+  const aspects = result.aspectos || [];
+  for (let b = 0; b < aspects.length; b += 3) {
+    const batch = aspects.slice(b, b + 3);
+    const sl = pres.addSlide(); sl.background = { color: C.CREAM };
+    sl.addText(b === 0 ? "ANÁLISE POR ASPECTOS" : "ANÁLISE POR ASPECTOS (CONT.)", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: C.NAVY, charSpacing: 3, bold: true, fontFace: "Calibri" });
+    sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.8, h: 0.03, fill: { color: C.GOLD } });
+    batch.forEach((a, idx) => {
+      const cy = 1.0 + idx * 1.5;
+      const sc = stColor(a.status);
+      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 8.8, h: 1.3, fill: { color: C.WHITE } });
+      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 0.06, h: 1.3, fill: { color: sc.tx } });
+      sl.addText(a.titulo || "", { x: 0.85, y: cy + 0.08, w: 5.5, h: 0.35, fontSize: 13, color: C.NAVY, bold: true, fontFace: "Georgia", margin: 0 });
+      sl.addShape(pres.shapes.RECTANGLE, { x: 6.5, y: cy + 0.1, w: 1.8, h: 0.28, fill: { color: sc.bg } });
+      sl.addText(sc.i + " " + a.status, { x: 6.5, y: cy + 0.1, w: 1.8, h: 0.28, fontSize: 8, color: sc.tx, bold: true, align: "center", valign: "middle", charSpacing: 1, fontFace: "Calibri" });
+      if (a.scoreItem !== undefined) sl.addText("Score: " + a.scoreItem + "/100", { x: 8.4, y: cy + 0.1, w: 0.9, h: 0.28, fontSize: 9, color: C.GOLD, bold: true, align: "right", valign: "middle", fontFace: "Calibri", margin: 0 });
+      if (a.fundamento) sl.addText(a.fundamento, { x: 0.85, y: cy + 0.4, w: 8.4, h: 0.25, fontSize: 8, color: C.GRAY, fontFace: "Calibri", margin: 0 });
+      const txt = (a.analiseTrabalhista || "").substring(0, 200);
+      sl.addText(txt + (txt.length >= 200 ? "..." : ""), { x: 0.85, y: cy + 0.65, w: 8.4, h: 0.55, fontSize: 9, color: C.DARK, fontFace: "Calibri", valign: "top", margin: 0 });
+      if (a.riscoTrabalhista) sl.addText("TRAB: " + a.riscoTrabalhista, { x: 0.85, y: cy + 1.08, w: 2.2, h: 0.2, fontSize: 7, color: C.Y_TX, bold: true, fontFace: "Calibri", margin: 0 });
+      if (a.riscoPrevidenciario && !a.apenasTrabalista) sl.addText("PREV: " + a.riscoPrevidenciario, { x: 3.2, y: cy + 1.08, w: 2.2, h: 0.2, fontSize: 7, color: C.R_TX, bold: true, fontFace: "Calibri", margin: 0 });
+    });
+    goldBar(sl);
+  }
+
+  // ── Conclusions ──
+  const sc = pres.addSlide(); sc.background = { color: C.CREAM };
+  sc.addText("CONCLUSÃO", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: C.NAVY, charSpacing: 3, bold: true, fontFace: "Calibri" });
+  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.2, h: 0.03, fill: { color: C.GOLD } });
+  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 1.0, w: 8.8, h: 2.0, fill: { color: C.WHITE } });
+  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 1.0, w: 0.06, h: 2.0, fill: { color: "3B82F6" } });
+  sc.addText("CONCLUSÃO — ÁREA TRABALHISTA", { x: 0.85, y: 1.05, w: 8, h: 0.3, fontSize: 8, color: C.B_TX, bold: true, charSpacing: 2, fontFace: "Calibri", margin: 0 });
+  sc.addText((result.conclusaoTrabalhista || "").substring(0, 500), { x: 0.85, y: 1.35, w: 8.3, h: 1.55, fontSize: 9, color: C.DARK, fontFace: "Calibri", valign: "top", margin: 0 });
+  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 3.2, w: 8.8, h: 2.0, fill: { color: C.WHITE } });
+  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 3.2, w: 0.06, h: 2.0, fill: { color: "F97316" } });
+  sc.addText("CONCLUSÃO — ÁREA TRIBUTÁRIA / PREVIDENCIÁRIA", { x: 0.85, y: 3.25, w: 8, h: 0.3, fontSize: 8, color: "9A3412", bold: true, charSpacing: 2, fontFace: "Calibri", margin: 0 });
+  sc.addText((result.conclusaoPrevidenciario || "").substring(0, 500), { x: 0.85, y: 3.55, w: 8.3, h: 1.55, fontSize: 9, color: C.DARK, fontFace: "Calibri", valign: "top", margin: 0 });
+  goldBar(sc);
+
+  // ── Recommendations ──
+  if (result.recomendacoes?.length) {
+    const sr = pres.addSlide(); sr.background = { color: C.NAVY };
+    sr.addText("RECOMENDAÇÕES", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: C.GOLD, charSpacing: 3, bold: true, fontFace: "Calibri" });
+    sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.82, w: 1.5, h: 0.03, fill: { color: C.GOLD } });
+    result.recomendacoes.forEach((rec, i) => {
+      const ry = 1.2 + i * 0.85;
+      if (ry + 0.7 > 5.2) return;
+      sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: ry, w: 0.45, h: 0.45, fill: { color: C.GOLD } });
+      sr.addText(String(i + 1).padStart(2, "0"), { x: 0.8, y: ry, w: 0.45, h: 0.45, fontSize: 12, color: C.NAVY, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
+      sr.addText((rec.length > 180 ? rec.substring(0, 177) + "..." : rec), { x: 1.5, y: ry + 0.02, w: 7.8, h: 0.45, fontSize: 11, color: C.CREAM, fontFace: "Calibri", valign: "middle", margin: 0 });
+    });
+    goldBar(sr);
+  }
+
+  // ── Pontos de Atenção ──
+  if (result.pontosDeAtencao?.length) {
+    const sp = pres.addSlide(); sp.background = { color: "FFFBEB" };
+    sp.addText("PONTOS DE ATENÇÃO — CONFIRMAR COM O CLIENTE", { x: 0.6, y: 0.4, w: 9, h: 0.4, fontSize: 10, color: C.Y_TX, charSpacing: 2, bold: true, fontFace: "Calibri" });
+    sp.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.82, w: 2.5, h: 0.03, fill: { color: C.GOLD } });
+    result.pontosDeAtencao.forEach((pt, i) => {
+      const py = 1.2 + i * 0.75;
+      if (py + 0.6 > 5.2) return;
+      sp.addText([
+        { text: "•  ", options: { fontSize: 14, color: C.GOLD, bold: true } },
+        { text: (pt.length > 200 ? pt.substring(0, 197) + "..." : pt), options: { fontSize: 11, color: "78350F" } }
+      ], { x: 0.7, y: py, w: 8.5, h: 0.6, fontFace: "Calibri", valign: "top", margin: 0 });
+    });
+    goldBar(sp);
+  }
+
+  // ── Closing ──
+  const se = pres.addSlide(); se.background = { color: C.NAVY };
+  se.addShape(pres.shapes.RECTANGLE, { x: 3.5, y: 1.8, w: 0.06, h: 0.8, fill: { color: C.GOLD } });
+  se.addText([
+    { text: "MACHADO MEYER ADVOGADOS", options: { fontSize: 14, color: C.CREAM, bold: true, charSpacing: 3, fontFace: "Calibri", breakLine: true } },
+    { text: "Área Trabalhista · Consultoria", options: { fontSize: 11, color: C.GRAY, fontFace: "Calibri" } }
+  ], { x: 3.8, y: 1.8, w: 5, h: 0.8, valign: "middle" });
+  se.addText("Documento gerado por IA · Uso interno\nSujeito à revisão do advogado responsável", { x: 2, y: 3.5, w: 6, h: 0.6, fontSize: 9, color: C.GRAY, align: "center", fontFace: "Calibri" });
+  goldBar(se);
+
+  await pres.writeFile({ fileName: "Analise_PLR_Compliance.pptx" });
+}
+
+// ─── UI Config ────────────────────────────────────────────────────────────────
 const statusConfig = {
   "CONFORME": { color: "#166534", bg: "#DCFCE7", border: "#86EFAC", icon: "✓" },
   "NÃO CONFORME": { color: "#991B1B", bg: "#FEE2E2", border: "#FCA5A5", icon: "✗" },
   "PARCIALMENTE CONFORME": { color: "#92400E", bg: "#FEF3C7", border: "#FCD34D", icon: "◐" }
 };
-
 const riskConfig = {
   "CONFORME": { color: "#166534", bg: "#DCFCE7" },
   "BAIXO RISCO": { color: "#1E40AF", bg: "#DBEAFE" },
   "RISCO MODERADO": { color: "#92400E", bg: "#FEF3C7" },
   "ALTO RISCO": { color: "#991B1B", bg: "#FEE2E2" }
 };
-
 const riskBadgeColor = (risk) => {
   if (!risk) return null;
   const r = risk.toUpperCase();
@@ -172,18 +309,17 @@ export default function PLRAnalyzer() {
   const [error, setError] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [step, setStep] = useState("upload");
+  const [pptxLoading, setPptxLoading] = useState(false);
 
   const readFileAsBase64 = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); });
   const readFileAsText = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(f); });
   const readDocxAsText = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = async () => { try { const result = await mammoth.extractRawText({ arrayBuffer: r.result }); res(result.value); } catch (e) { rej(e); } }; r.onerror = rej; r.readAsArrayBuffer(f); });
-
   const readFileContent = async (f) => {
     const name = f.name.toLowerCase();
     if (name.endsWith(".docx") || name.endsWith(".doc")) return await readDocxAsText(f);
     if (f.type === "application/pdf") { const b64 = await readFileAsBase64(f); return { isPDF: true, b64 }; }
     return await readFileAsText(f);
   };
-
   const handleDrop = useCallback((e) => { e.preventDefault(); setDragOver(false); if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); }, []);
 
   const analyze = async () => {
@@ -200,17 +336,14 @@ export default function PLRAnalyzer() {
         userContent.push({ type: "text", text: `ACORDO COLETIVO DE PLR:\n\n${t}${text.length > 400000 ? "\n\n[... TRUNCADO ...]" : ""}` });
       }
       userContent.push({ type: "text", text: "Analise o acordo coletivo de PLR acima conforme o checklist. Retorne o JSON conforme instruído." });
-
       const apiKey = process.env.REACT_APP_ANTHROPIC_API_KEY;
       if (!apiKey) throw new Error("API key não configurada.");
-
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
         body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000, temperature: 0, system: SYSTEM_PROMPT, messages: [{ role: "user", content: userContent }] })
       });
       if (!response.ok) { const e = await response.json().catch(() => ({})); throw new Error(e.error?.message || `Erro: ${response.status}`); }
-
       const data = await response.json();
       const raw = data.content.map(i => i.text || "").join("");
       setResult(JSON.parse(raw.replace(/```json|```/g, "").trim()));
@@ -219,9 +352,16 @@ export default function PLRAnalyzer() {
     finally { setLoading(false); }
   };
 
+  const handlePPTX = async () => {
+    if (!result) return;
+    setPptxLoading(true);
+    try { await generatePPTX(result); }
+    catch (err) { alert("Erro ao gerar PPTX: " + err.message); }
+    finally { setPptxLoading(false); }
+  };
+
   const reset = () => { setFile(null); setResult(null); setError(null); setStep("upload"); };
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
   const groupAspects = (a) => {
     if (!a) return { conforme: [], parcial: [], naoConforme: [], dispensados: [] };
     const disp = a.filter(x => x.apenasTrabalista || x.titulo?.toLowerCase().includes("dispensad"));
@@ -232,12 +372,7 @@ export default function PLRAnalyzer() {
   const RiskBox = ({ label, risk }) => {
     if (!risk) return null;
     const c = riskBadgeColor(risk);
-    return (
-      <div style={{ minWidth: "140px", padding: "10px 14px", borderRadius: "4px", border: `1px solid ${c.border}`, background: c.bg, textAlign: "center" }}>
-        <div style={{ fontSize: "9px", letterSpacing: "1px", color: "#6B7280", marginBottom: "4px", fontWeight: "600" }}>{label}</div>
-        <div style={{ fontSize: "12px", fontWeight: "700", color: c.color }}>{risk}</div>
-      </div>
-    );
+    return (<div style={{ minWidth: "140px", padding: "10px 14px", borderRadius: "4px", border: `1px solid ${c.border}`, background: c.bg, textAlign: "center" }}><div style={{ fontSize: "9px", letterSpacing: "1px", color: "#6B7280", marginBottom: "4px", fontWeight: "600" }}>{label}</div><div style={{ fontSize: "12px", fontWeight: "700", color: c.color }}>{risk}</div></div>);
   };
 
   const AspectCard = ({ aspecto: a }) => {
@@ -258,41 +393,20 @@ export default function PLRAnalyzer() {
             {!a.apenasTrabalista && a.riscoPrevidenciario && <RiskBox label="TRIBUTÁRIO / PREVIDENCIÁRIO" risk={a.riscoPrevidenciario} />}
           </div>
         </div>
-        {a.analiseTrabalhista && (
-          <div style={{ marginBottom: a.analisePrevidenciario ? "12px" : 0 }}>
-            {a.analisePrevidenciario && <div style={{ fontSize: "10px", letterSpacing: "1px", color: "#1E40AF", fontWeight: "700", marginBottom: "4px" }}>ANÁLISE TRABALHISTA</div>}
-            <p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>{a.analiseTrabalhista}</p>
-          </div>
-        )}
-        {a.analisePrevidenciario && !a.apenasTrabalista && (
-          <div>
-            <div style={{ fontSize: "10px", letterSpacing: "1px", color: "#9A3412", fontWeight: "700", marginBottom: "4px" }}>ANÁLISE TRIBUTÁRIA / PREVIDENCIÁRIA</div>
-            <p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>{a.analisePrevidenciario}</p>
-          </div>
-        )}
+        {a.analiseTrabalhista && (<div style={{ marginBottom: a.analisePrevidenciario ? "12px" : 0 }}>{a.analisePrevidenciario && <div style={{ fontSize: "10px", letterSpacing: "1px", color: "#1E40AF", fontWeight: "700", marginBottom: "4px" }}>ANÁLISE TRABALHISTA</div>}<p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>{a.analiseTrabalhista}</p></div>)}
+        {a.analisePrevidenciario && !a.apenasTrabalista && (<div><div style={{ fontSize: "10px", letterSpacing: "1px", color: "#9A3412", fontWeight: "700", marginBottom: "4px" }}>ANÁLISE TRIBUTÁRIA / PREVIDENCIÁRIA</div><p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>{a.analisePrevidenciario}</p></div>)}
       </div>
     );
   };
 
   const Section = ({ title, items, color }) => {
     if (!items?.length) return null;
-    return (
-      <div style={{ marginBottom: "24px" }}>
-        <h4 style={{ color: "#0A1628", fontSize: "12px", letterSpacing: "2px", margin: "0 0 12px", paddingBottom: "6px", borderBottom: `2px solid ${color}`, fontWeight: "700" }}>{title}</h4>
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{items.map((a, i) => <AspectCard key={i} aspecto={a} />)}</div>
-      </div>
-    );
+    return (<div style={{ marginBottom: "24px" }}><h4 style={{ color: "#0A1628", fontSize: "12px", letterSpacing: "2px", margin: "0 0 12px", paddingBottom: "6px", borderBottom: `2px solid ${color}`, fontWeight: "700" }}>{title}</h4><div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{items.map((a, i) => <AspectCard key={i} aspecto={a} />)}</div></div>);
   };
 
   const ScoreBlock = ({ label, score, classificacao }) => {
     const c = riskConfig[classificacao] || riskConfig["RISCO MODERADO"];
-    return (
-      <div style={{ textAlign: "center", flex: 1 }}>
-        <div style={{ color: "rgba(245,242,236,0.5)", fontSize: "9px", letterSpacing: "2px", marginBottom: "6px" }}>{label}</div>
-        <div style={{ color: "#B8962E", fontSize: "44px", fontWeight: "700", lineHeight: 1 }}>{score}</div>
-        <span style={{ ...c, display: "inline-block", marginTop: "8px", padding: "4px 14px", borderRadius: "2px", fontSize: "10px", letterSpacing: "1.5px", fontWeight: "700" }}>{classificacao}</span>
-      </div>
-    );
+    return (<div style={{ textAlign: "center", flex: 1 }}><div style={{ color: "rgba(245,242,236,0.5)", fontSize: "9px", letterSpacing: "2px", marginBottom: "6px" }}>{label}</div><div style={{ color: "#B8962E", fontSize: "44px", fontWeight: "700", lineHeight: 1 }}>{score}</div><span style={{ ...c, display: "inline-block", marginTop: "8px", padding: "4px 14px", borderRadius: "2px", fontSize: "10px", letterSpacing: "1.5px", fontWeight: "700" }}>{classificacao}</span></div>);
   };
 
   const g = result ? groupAspects(result.aspectos) : null;
@@ -301,10 +415,7 @@ export default function PLRAnalyzer() {
     <div style={{ minHeight: "100vh", background: "#F5F2EC", fontFamily: "'Georgia', serif" }}>
       <header style={{ background: "#FFD600", borderBottom: "4px solid #FFD600", padding: "16px 48px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
         <MM_LOGO height={100} />
-        <div style={{ textAlign: "right" }}>
-          <div style={{ color: "#0A1628", fontSize: "11px", letterSpacing: "3px", marginBottom: "2px", fontWeight: "600" }}>ÁREA TRABALHISTA</div>
-          <div style={{ color: "#0A1628", fontSize: "13px", letterSpacing: "1px" }}>Analisador de Compliance PLR</div>
-        </div>
+        <div style={{ textAlign: "right" }}><div style={{ color: "#0A1628", fontSize: "11px", letterSpacing: "3px", marginBottom: "2px", fontWeight: "600" }}>ÁREA TRABALHISTA</div><div style={{ color: "#0A1628", fontSize: "13px", letterSpacing: "1px" }}>Analisador de Compliance PLR</div></div>
       </header>
 
       {step === "upload" && (
@@ -350,7 +461,6 @@ export default function PLRAnalyzer() {
 
         {step === "result" && result && (
           <div>
-            {/* Header */}
             <div style={{ background: "#0A1628", borderRadius: "4px", padding: "48px", marginBottom: "32px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px" }}>
                 <div>
@@ -365,18 +475,10 @@ export default function PLRAnalyzer() {
                 <ScoreBlock label="SCORE TRABALHISTA" score={result.scoreTrabalhista} classificacao={result.classificacaoTrabalhista} />
                 <div style={{ width: "1px", height: "80px", background: "rgba(184,150,46,0.3)" }}/>
                 <ScoreBlock label="SCORE TRIBUTÁRIO / PREV." score={result.scorePrevidenciario} classificacao={result.classificacaoPrevidenciario} />
-                {result.scoreNuance !== undefined && (<>
-                  <div style={{ width: "1px", height: "80px", background: "rgba(184,150,46,0.3)" }}/>
-                  <div style={{ textAlign: "center", flex: 1 }}>
-                    <div style={{ color: "rgba(245,242,236,0.5)", fontSize: "9px", letterSpacing: "2px", marginBottom: "6px" }}>SCORE DE NUANCE</div>
-                    <div style={{ color: "#F5F2EC", fontSize: "32px", fontWeight: "700", lineHeight: 1 }}>{result.scoreNuance}</div>
-                    <div style={{ color: "rgba(245,242,236,0.35)", fontSize: "9px", marginTop: "6px" }}>Média: Data + Metas ± Diretores</div>
-                  </div>
-                </>)}
+                {result.scoreNuance !== undefined && (<><div style={{ width: "1px", height: "80px", background: "rgba(184,150,46,0.3)" }}/><div style={{ textAlign: "center", flex: 1 }}><div style={{ color: "rgba(245,242,236,0.5)", fontSize: "9px", letterSpacing: "2px", marginBottom: "6px" }}>SCORE DE NUANCE</div><div style={{ color: "#F5F2EC", fontSize: "32px", fontWeight: "700", lineHeight: 1 }}>{result.scoreNuance}</div><div style={{ color: "rgba(245,242,236,0.35)", fontSize: "9px", marginTop: "6px" }}>Média: Data + Metas ± Diretores</div></div></>)}
               </div>
             </div>
 
-            {/* I. Aspectos */}
             <div style={{ marginBottom: "32px" }}>
               <h3 style={{ color: "#0A1628", fontSize: "13px", letterSpacing: "3px", margin: "0 0 20px", borderBottom: "2px solid #B8962E", paddingBottom: "8px" }}>I. ANÁLISE POR ASPECTOS</h3>
               <Section title="CONFORME" items={g.conforme} color="#86EFAC" />
@@ -385,7 +487,6 @@ export default function PLRAnalyzer() {
               {g.dispensados?.length > 0 && <Section title="EMPREGADOS DISPENSADOS OU AFASTADOS (APENAS TRABALHISTA)" items={g.dispensados} color="#93C5FD" />}
             </div>
 
-            {/* II. Conclusão */}
             <div style={{ marginBottom: "24px" }}>
               <h3 style={{ color: "#0A1628", fontSize: "13px", letterSpacing: "3px", margin: "0 0 20px", borderBottom: "2px solid #B8962E", paddingBottom: "8px" }}>II. CONCLUSÃO</h3>
               <div style={{ background: "#fff", borderRadius: "4px", border: "1px solid #E8E2D9", borderLeft: "4px solid #3B82F6", padding: "28px 36px", marginBottom: "16px" }}>
@@ -398,7 +499,6 @@ export default function PLRAnalyzer() {
               </div>
             </div>
 
-            {/* III. Recomendações */}
             <div style={{ background: "#0A1628", borderRadius: "4px", padding: "36px 40px", marginBottom: "24px" }}>
               <h3 style={{ color: "#B8962E", fontSize: "13px", letterSpacing: "3px", margin: "0 0 24px", borderBottom: "1px solid rgba(184,150,46,0.3)", paddingBottom: "8px" }}>III. RECOMENDAÇÕES</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -411,7 +511,6 @@ export default function PLRAnalyzer() {
               </div>
             </div>
 
-            {/* IV. Pontos de Atenção */}
             {result.pontosDeAtencao?.length > 0 && (
               <div style={{ background: "#FFFBEB", borderRadius: "4px", border: "1px solid #FCD34D", padding: "28px 36px", marginBottom: "24px" }}>
                 <h3 style={{ color: "#92400E", fontSize: "13px", letterSpacing: "3px", margin: "0 0 16px" }}>IV. PONTOS DE ATENÇÃO — CONFIRMAR COM O CLIENTE</h3>
@@ -426,20 +525,14 @@ export default function PLRAnalyzer() {
               </div>
             )}
 
-            {/* Footer */}
             <div style={{ borderTop: "1px solid #D1C9BB", paddingTop: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "40px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ width: "3px", height: "36px", background: "#B8962E" }}/>
-                <div>
-                  <div style={{ color: "#0A1628", fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>MACHADO MEYER ADVOGADOS</div>
-                  <div style={{ color: "#9CA3AF", fontSize: "11px" }}>Área Trabalhista · Consultoria</div>
-                </div>
-              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><div style={{ width: "3px", height: "36px", background: "#B8962E" }}/><div><div style={{ color: "#0A1628", fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>MACHADO MEYER ADVOGADOS</div><div style={{ color: "#9CA3AF", fontSize: "11px" }}>Área Trabalhista · Consultoria</div></div></div>
               <div style={{ color: "#9CA3AF", fontSize: "11px", textAlign: "right" }}>Documento gerado por IA · Uso interno<br/>Sujeito à revisão do advogado responsável</div>
             </div>
 
             <div style={{ display: "flex", gap: "12px" }}>
               <button onClick={() => window.print()} style={{ flex: 1, padding: "14px", background: "#B8962E", color: "#fff", border: "none", borderRadius: "4px", fontSize: "13px", fontFamily: "'Georgia', serif", letterSpacing: "2px", cursor: "pointer" }}>EXPORTAR PDF</button>
+              <button onClick={handlePPTX} disabled={pptxLoading} style={{ flex: 1, padding: "14px", background: "#0A1628", color: "#F5F2EC", border: "none", borderRadius: "4px", fontSize: "13px", fontFamily: "'Georgia', serif", letterSpacing: "2px", cursor: pptxLoading ? "wait" : "pointer", opacity: pptxLoading ? 0.7 : 1 }}>{pptxLoading ? "GERANDO..." : "EXPORTAR PPTX"}</button>
               <button onClick={reset} style={{ flex: 1, padding: "14px", background: "transparent", color: "#0A1628", border: "2px solid #0A1628", borderRadius: "4px", fontSize: "13px", fontFamily: "'Georgia', serif", letterSpacing: "2px", cursor: "pointer" }}>NOVA ANÁLISE</button>
             </div>
           </div>
