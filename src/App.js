@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
 import * as mammoth from "mammoth";
-import pptxgen from "pptxgenjs";
 
 const MM_LOGO = ({ height = 100 }) => (
   <img src={process.env.PUBLIC_URL + "/mm-logo.png"} alt="Machado Meyer Advogados" style={{ height, objectFit: "contain" }} />
@@ -143,40 +142,52 @@ FORMATO DE RESPOSTA — APENAS JSON válido, sem markdown:
   "classificacaoPrevidenciario": "ALTO RISCO"/"RISCO MODERADO"/"BAIXO RISCO"/"CONFORME"
 }`;
 
-// ─── PPTX Colors ──────────────────────────────────────────────────────────────
-const C = { NAVY: "0A1628", GOLD: "B8962E", CREAM: "F5F2EC", WHITE: "FFFFFF", GRAY: "6B7280", DARK: "1E293B", G_BG: "DCFCE7", G_TX: "166534", R_BG: "FEE2E2", R_TX: "991B1B", Y_BG: "FEF3C7", Y_TX: "92400E", B_BG: "DBEAFE", B_TX: "1E40AF" };
+// ─── Load pptxgenjs from CDN (no npm install needed) ─────────────────────────
+function loadPptxGen() {
+  return new Promise((resolve, reject) => {
+    if (window.PptxGenJS) return resolve(window.PptxGenJS);
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/gh/gitbrent/PptxGenJS@3.12.0/dist/pptxgen.bundle.js";
+    s.onload = () => resolve(window.PptxGenJS);
+    s.onerror = () => reject(new Error("Falha ao carregar pptxgenjs"));
+    document.head.appendChild(s);
+  });
+}
 
-function stColor(s) { return s === "CONFORME" ? { bg: C.G_BG, tx: C.G_TX, i: "✓" } : s === "NÃO CONFORME" ? { bg: C.R_BG, tx: C.R_TX, i: "✗" } : { bg: C.Y_BG, tx: C.Y_TX, i: "◐" }; }
-function clColor(c) { return c === "CONFORME" ? { bg: C.G_BG, tx: C.G_TX } : c === "BAIXO RISCO" ? { bg: C.B_BG, tx: C.B_TX } : c === "ALTO RISCO" ? { bg: C.R_BG, tx: C.R_TX } : { bg: C.Y_BG, tx: C.Y_TX }; }
+// ─── PPTX Colors ──────────────────────────────────────────────────────────────
+const P = { NV: "0A1628", GD: "B8962E", CR: "F5F2EC", WH: "FFFFFF", GR: "6B7280", DK: "1E293B", GB: "DCFCE7", GT: "166534", RB: "FEE2E2", RT: "991B1B", YB: "FEF3C7", YT: "92400E", BB: "DBEAFE", BT: "1E40AF" };
+function stC(s) { return s === "CONFORME" ? { bg: P.GB, tx: P.GT, i: "✓" } : s === "NÃO CONFORME" ? { bg: P.RB, tx: P.RT, i: "✗" } : { bg: P.YB, tx: P.YT, i: "◐" }; }
+function clC(c) { return c === "CONFORME" ? { bg: P.GB, tx: P.GT } : c === "BAIXO RISCO" ? { bg: P.BB, tx: P.BT } : c === "ALTO RISCO" ? { bg: P.RB, tx: P.RT } : { bg: P.YB, tx: P.YT }; }
 
 async function generatePPTX(result) {
-  const pres = new pptxgen();
+  const PptxGenJS = await loadPptxGen();
+  const pres = new PptxGenJS();
   pres.layout = "LAYOUT_16x9";
   pres.author = "Machado Meyer Advogados";
   pres.title = "Análise de Compliance PLR";
   const dt = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-  const goldBar = (sl) => sl.addShape(pres.shapes.RECTANGLE, { x: 0, y: 5.45, w: 10, h: 0.175, fill: { color: C.GOLD } });
+  const bar = (sl) => sl.addShape(pres.shapes.RECTANGLE, { x: 0, y: 5.45, w: 10, h: 0.175, fill: { color: P.GD } });
 
-  // ── S1: Title ──
-  const s1 = pres.addSlide(); s1.background = { color: C.NAVY };
-  s1.addShape(pres.shapes.RECTANGLE, { x: 8.2, y: 0, w: 0.01, h: 5.625, fill: { color: C.GOLD, transparency: 80 } });
-  s1.addShape(pres.shapes.RECTANGLE, { x: 9.0, y: 0, w: 0.01, h: 5.625, fill: { color: C.GOLD, transparency: 90 } });
-  s1.addText("INTELIGÊNCIA ARTIFICIAL · CONSULTORIA TRABALHISTA", { x: 0.8, y: 1.0, w: 8, h: 0.4, fontSize: 9, color: C.GOLD, charSpacing: 4, fontFace: "Calibri" });
+  // S1: Title
+  const s1 = pres.addSlide(); s1.background = { color: P.NV };
+  s1.addShape(pres.shapes.RECTANGLE, { x: 8.2, y: 0, w: 0.01, h: 5.625, fill: { color: P.GD, transparency: 80 } });
+  s1.addShape(pres.shapes.RECTANGLE, { x: 9.0, y: 0, w: 0.01, h: 5.625, fill: { color: P.GD, transparency: 90 } });
+  s1.addText("INTELIGÊNCIA ARTIFICIAL · CONSULTORIA TRABALHISTA", { x: 0.8, y: 1.0, w: 8, h: 0.4, fontSize: 9, color: P.GD, charSpacing: 4, fontFace: "Calibri" });
   s1.addText([
-    { text: "Análise de Compliance", options: { fontSize: 36, color: C.CREAM, fontFace: "Georgia", breakLine: true } },
-    { text: "Acordos Coletivos de PLR", options: { fontSize: 36, color: C.GOLD, fontFace: "Georgia" } }
+    { text: "Análise de Compliance", options: { fontSize: 36, color: P.CR, fontFace: "Georgia", breakLine: true } },
+    { text: "Acordos Coletivos de PLR", options: { fontSize: 36, color: P.GD, fontFace: "Georgia" } }
   ], { x: 0.8, y: 1.6, w: 8, h: 2, valign: "top" });
-  s1.addText("Lei nº 10.101/2000 · Jurisprudência CARF, TST e TRFs", { x: 0.8, y: 3.6, w: 8, h: 0.4, fontSize: 13, color: C.CREAM, fontFace: "Calibri" });
+  s1.addText("Lei nº 10.101/2000 · Jurisprudência CARF, TST e TRFs", { x: 0.8, y: 3.6, w: 8, h: 0.4, fontSize: 13, color: P.CR, fontFace: "Calibri" });
   s1.addText([
-    { text: "MACHADO MEYER ADVOGADOS", options: { fontSize: 10, color: C.GOLD, bold: true, charSpacing: 2, breakLine: true, fontFace: "Calibri" } },
-    { text: "Área Trabalhista · " + dt, options: { fontSize: 10, color: C.GRAY, fontFace: "Calibri" } }
+    { text: "MACHADO MEYER ADVOGADOS", options: { fontSize: 10, color: P.GD, bold: true, charSpacing: 2, breakLine: true, fontFace: "Calibri" } },
+    { text: "Área Trabalhista · " + dt, options: { fontSize: 10, color: P.GR, fontFace: "Calibri" } }
   ], { x: 0.8, y: 4.6, w: 6, h: 0.7, valign: "bottom" });
-  goldBar(s1);
+  bar(s1);
 
-  // ── S2: Scores ──
-  const s2 = pres.addSlide(); s2.background = { color: C.NAVY };
-  s2.addText("RESULTADO DA ANÁLISE", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: C.GOLD, charSpacing: 4, fontFace: "Calibri" });
-  s2.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.85, w: 1.5, h: 0.03, fill: { color: C.GOLD } });
+  // S2: Scores
+  const s2 = pres.addSlide(); s2.background = { color: P.NV };
+  s2.addText("RESULTADO DA ANÁLISE", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: P.GD, charSpacing: 4, fontFace: "Calibri" });
+  s2.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.85, w: 1.5, h: 0.03, fill: { color: P.GD } });
   const scores = [
     { label: "SCORE TRABALHISTA", val: result.scoreTrabalhista, cls: result.classificacaoTrabalhista },
     { label: "SCORE TRIBUTÁRIO / PREV.", val: result.scorePrevidenciario, cls: result.classificacaoPrevidenciario },
@@ -187,97 +198,97 @@ async function generatePPTX(result) {
   scores.forEach((s, i) => {
     const bx = sX + i * (bW + gp);
     s2.addShape(pres.shapes.RECTANGLE, { x: bx, y: 1.3, w: bW, h: 3.0, fill: { color: "0F1F38" } });
-    s2.addText(s.label, { x: bx, y: 1.5, w: bW, h: 0.4, fontSize: 8, color: C.GRAY, align: "center", charSpacing: 2, fontFace: "Calibri" });
-    s2.addText(String(s.val), { x: bx, y: 2.0, w: bW, h: 1.2, fontSize: 54, color: C.GOLD, bold: true, align: "center", valign: "middle", fontFace: "Georgia" });
+    s2.addText(s.label, { x: bx, y: 1.5, w: bW, h: 0.4, fontSize: 8, color: P.GR, align: "center", charSpacing: 2, fontFace: "Calibri" });
+    s2.addText(String(s.val), { x: bx, y: 2.0, w: bW, h: 1.2, fontSize: 54, color: P.GD, bold: true, align: "center", valign: "middle", fontFace: "Georgia" });
     if (s.cls) {
-      const cc = clColor(s.cls);
+      const cc = clC(s.cls);
       s2.addShape(pres.shapes.RECTANGLE, { x: bx + bW * 0.15, y: 3.4, w: bW * 0.7, h: 0.4, fill: { color: cc.bg } });
       s2.addText(s.cls, { x: bx + bW * 0.15, y: 3.4, w: bW * 0.7, h: 0.4, fontSize: 9, color: cc.tx, bold: true, align: "center", valign: "middle", charSpacing: 1, fontFace: "Calibri" });
     } else {
-      s2.addText("Média: Data + Metas ± Diretores", { x: bx, y: 3.5, w: bW, h: 0.3, fontSize: 8, color: C.GRAY, align: "center", fontFace: "Calibri" });
+      s2.addText("Média: Data + Metas ± Diretores", { x: bx, y: 3.5, w: bW, h: 0.3, fontSize: 8, color: P.GR, align: "center", fontFace: "Calibri" });
     }
   });
-  goldBar(s2);
+  bar(s2);
 
-  // ── Aspects (3 per slide) ──
+  // Aspects (3 per slide)
   const aspects = result.aspectos || [];
   for (let b = 0; b < aspects.length; b += 3) {
     const batch = aspects.slice(b, b + 3);
-    const sl = pres.addSlide(); sl.background = { color: C.CREAM };
-    sl.addText(b === 0 ? "ANÁLISE POR ASPECTOS" : "ANÁLISE POR ASPECTOS (CONT.)", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: C.NAVY, charSpacing: 3, bold: true, fontFace: "Calibri" });
-    sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.8, h: 0.03, fill: { color: C.GOLD } });
+    const sl = pres.addSlide(); sl.background = { color: P.CR };
+    sl.addText(b === 0 ? "ANÁLISE POR ASPECTOS" : "ANÁLISE POR ASPECTOS (CONT.)", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: P.NV, charSpacing: 3, bold: true, fontFace: "Calibri" });
+    sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.8, h: 0.03, fill: { color: P.GD } });
     batch.forEach((a, idx) => {
       const cy = 1.0 + idx * 1.5;
-      const sc = stColor(a.status);
-      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 8.8, h: 1.3, fill: { color: C.WHITE } });
+      const sc = stC(a.status);
+      sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 8.8, h: 1.3, fill: { color: P.WH } });
       sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 0.06, h: 1.3, fill: { color: sc.tx } });
-      sl.addText(a.titulo || "", { x: 0.85, y: cy + 0.08, w: 5.5, h: 0.35, fontSize: 13, color: C.NAVY, bold: true, fontFace: "Georgia", margin: 0 });
+      sl.addText(a.titulo || "", { x: 0.85, y: cy + 0.08, w: 5.5, h: 0.35, fontSize: 13, color: P.NV, bold: true, fontFace: "Georgia", margin: 0 });
       sl.addShape(pres.shapes.RECTANGLE, { x: 6.5, y: cy + 0.1, w: 1.8, h: 0.28, fill: { color: sc.bg } });
       sl.addText(sc.i + " " + a.status, { x: 6.5, y: cy + 0.1, w: 1.8, h: 0.28, fontSize: 8, color: sc.tx, bold: true, align: "center", valign: "middle", charSpacing: 1, fontFace: "Calibri" });
-      if (a.scoreItem !== undefined) sl.addText("Score: " + a.scoreItem + "/100", { x: 8.4, y: cy + 0.1, w: 0.9, h: 0.28, fontSize: 9, color: C.GOLD, bold: true, align: "right", valign: "middle", fontFace: "Calibri", margin: 0 });
-      if (a.fundamento) sl.addText(a.fundamento, { x: 0.85, y: cy + 0.4, w: 8.4, h: 0.25, fontSize: 8, color: C.GRAY, fontFace: "Calibri", margin: 0 });
+      if (a.scoreItem !== undefined) sl.addText("Score: " + a.scoreItem + "/100", { x: 8.4, y: cy + 0.1, w: 0.9, h: 0.28, fontSize: 9, color: P.GD, bold: true, align: "right", valign: "middle", fontFace: "Calibri", margin: 0 });
+      if (a.fundamento) sl.addText(a.fundamento, { x: 0.85, y: cy + 0.4, w: 8.4, h: 0.25, fontSize: 8, color: P.GR, fontFace: "Calibri", margin: 0 });
       const txt = (a.analiseTrabalhista || "").substring(0, 200);
-      sl.addText(txt + (txt.length >= 200 ? "..." : ""), { x: 0.85, y: cy + 0.65, w: 8.4, h: 0.55, fontSize: 9, color: C.DARK, fontFace: "Calibri", valign: "top", margin: 0 });
-      if (a.riscoTrabalhista) sl.addText("TRAB: " + a.riscoTrabalhista, { x: 0.85, y: cy + 1.08, w: 2.2, h: 0.2, fontSize: 7, color: C.Y_TX, bold: true, fontFace: "Calibri", margin: 0 });
-      if (a.riscoPrevidenciario && !a.apenasTrabalista) sl.addText("PREV: " + a.riscoPrevidenciario, { x: 3.2, y: cy + 1.08, w: 2.2, h: 0.2, fontSize: 7, color: C.R_TX, bold: true, fontFace: "Calibri", margin: 0 });
+      sl.addText(txt + (txt.length >= 200 ? "..." : ""), { x: 0.85, y: cy + 0.65, w: 8.4, h: 0.55, fontSize: 9, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
+      if (a.riscoTrabalhista) sl.addText("TRAB: " + a.riscoTrabalhista, { x: 0.85, y: cy + 1.08, w: 2.2, h: 0.2, fontSize: 7, color: P.YT, bold: true, fontFace: "Calibri", margin: 0 });
+      if (a.riscoPrevidenciario && !a.apenasTrabalista) sl.addText("PREV: " + a.riscoPrevidenciario, { x: 3.2, y: cy + 1.08, w: 2.2, h: 0.2, fontSize: 7, color: P.RT, bold: true, fontFace: "Calibri", margin: 0 });
     });
-    goldBar(sl);
+    bar(sl);
   }
 
-  // ── Conclusions ──
-  const sc = pres.addSlide(); sc.background = { color: C.CREAM };
-  sc.addText("CONCLUSÃO", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: C.NAVY, charSpacing: 3, bold: true, fontFace: "Calibri" });
-  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.2, h: 0.03, fill: { color: C.GOLD } });
-  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 1.0, w: 8.8, h: 2.0, fill: { color: C.WHITE } });
+  // Conclusions
+  const sc = pres.addSlide(); sc.background = { color: P.CR };
+  sc.addText("CONCLUSÃO", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: P.NV, charSpacing: 3, bold: true, fontFace: "Calibri" });
+  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.2, h: 0.03, fill: { color: P.GD } });
+  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 1.0, w: 8.8, h: 2.0, fill: { color: P.WH } });
   sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 1.0, w: 0.06, h: 2.0, fill: { color: "3B82F6" } });
-  sc.addText("CONCLUSÃO — ÁREA TRABALHISTA", { x: 0.85, y: 1.05, w: 8, h: 0.3, fontSize: 8, color: C.B_TX, bold: true, charSpacing: 2, fontFace: "Calibri", margin: 0 });
-  sc.addText((result.conclusaoTrabalhista || "").substring(0, 500), { x: 0.85, y: 1.35, w: 8.3, h: 1.55, fontSize: 9, color: C.DARK, fontFace: "Calibri", valign: "top", margin: 0 });
-  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 3.2, w: 8.8, h: 2.0, fill: { color: C.WHITE } });
+  sc.addText("CONCLUSÃO — ÁREA TRABALHISTA", { x: 0.85, y: 1.05, w: 8, h: 0.3, fontSize: 8, color: P.BT, bold: true, charSpacing: 2, fontFace: "Calibri", margin: 0 });
+  sc.addText((result.conclusaoTrabalhista || "").substring(0, 500), { x: 0.85, y: 1.35, w: 8.3, h: 1.55, fontSize: 9, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
+  sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 3.2, w: 8.8, h: 2.0, fill: { color: P.WH } });
   sc.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 3.2, w: 0.06, h: 2.0, fill: { color: "F97316" } });
   sc.addText("CONCLUSÃO — ÁREA TRIBUTÁRIA / PREVIDENCIÁRIA", { x: 0.85, y: 3.25, w: 8, h: 0.3, fontSize: 8, color: "9A3412", bold: true, charSpacing: 2, fontFace: "Calibri", margin: 0 });
-  sc.addText((result.conclusaoPrevidenciario || "").substring(0, 500), { x: 0.85, y: 3.55, w: 8.3, h: 1.55, fontSize: 9, color: C.DARK, fontFace: "Calibri", valign: "top", margin: 0 });
-  goldBar(sc);
+  sc.addText((result.conclusaoPrevidenciario || "").substring(0, 500), { x: 0.85, y: 3.55, w: 8.3, h: 1.55, fontSize: 9, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
+  bar(sc);
 
-  // ── Recommendations ──
+  // Recommendations
   if (result.recomendacoes?.length) {
-    const sr = pres.addSlide(); sr.background = { color: C.NAVY };
-    sr.addText("RECOMENDAÇÕES", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: C.GOLD, charSpacing: 3, bold: true, fontFace: "Calibri" });
-    sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.82, w: 1.5, h: 0.03, fill: { color: C.GOLD } });
+    const sr = pres.addSlide(); sr.background = { color: P.NV };
+    sr.addText("RECOMENDAÇÕES", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: P.GD, charSpacing: 3, bold: true, fontFace: "Calibri" });
+    sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.82, w: 1.5, h: 0.03, fill: { color: P.GD } });
     result.recomendacoes.forEach((rec, i) => {
       const ry = 1.2 + i * 0.85;
       if (ry + 0.7 > 5.2) return;
-      sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: ry, w: 0.45, h: 0.45, fill: { color: C.GOLD } });
-      sr.addText(String(i + 1).padStart(2, "0"), { x: 0.8, y: ry, w: 0.45, h: 0.45, fontSize: 12, color: C.NAVY, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
-      sr.addText((rec.length > 180 ? rec.substring(0, 177) + "..." : rec), { x: 1.5, y: ry + 0.02, w: 7.8, h: 0.45, fontSize: 11, color: C.CREAM, fontFace: "Calibri", valign: "middle", margin: 0 });
+      sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: ry, w: 0.45, h: 0.45, fill: { color: P.GD } });
+      sr.addText(String(i + 1).padStart(2, "0"), { x: 0.8, y: ry, w: 0.45, h: 0.45, fontSize: 12, color: P.NV, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
+      sr.addText((rec.length > 180 ? rec.substring(0, 177) + "..." : rec), { x: 1.5, y: ry + 0.02, w: 7.8, h: 0.45, fontSize: 11, color: P.CR, fontFace: "Calibri", valign: "middle", margin: 0 });
     });
-    goldBar(sr);
+    bar(sr);
   }
 
-  // ── Pontos de Atenção ──
+  // Pontos de Atenção
   if (result.pontosDeAtencao?.length) {
     const sp = pres.addSlide(); sp.background = { color: "FFFBEB" };
-    sp.addText("PONTOS DE ATENÇÃO — CONFIRMAR COM O CLIENTE", { x: 0.6, y: 0.4, w: 9, h: 0.4, fontSize: 10, color: C.Y_TX, charSpacing: 2, bold: true, fontFace: "Calibri" });
-    sp.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.82, w: 2.5, h: 0.03, fill: { color: C.GOLD } });
+    sp.addText("PONTOS DE ATENÇÃO — CONFIRMAR COM O CLIENTE", { x: 0.6, y: 0.4, w: 9, h: 0.4, fontSize: 10, color: P.YT, charSpacing: 2, bold: true, fontFace: "Calibri" });
+    sp.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.82, w: 2.5, h: 0.03, fill: { color: P.GD } });
     result.pontosDeAtencao.forEach((pt, i) => {
       const py = 1.2 + i * 0.75;
       if (py + 0.6 > 5.2) return;
       sp.addText([
-        { text: "•  ", options: { fontSize: 14, color: C.GOLD, bold: true } },
+        { text: "•  ", options: { fontSize: 14, color: P.GD, bold: true } },
         { text: (pt.length > 200 ? pt.substring(0, 197) + "..." : pt), options: { fontSize: 11, color: "78350F" } }
       ], { x: 0.7, y: py, w: 8.5, h: 0.6, fontFace: "Calibri", valign: "top", margin: 0 });
     });
-    goldBar(sp);
+    bar(sp);
   }
 
-  // ── Closing ──
-  const se = pres.addSlide(); se.background = { color: C.NAVY };
-  se.addShape(pres.shapes.RECTANGLE, { x: 3.5, y: 1.8, w: 0.06, h: 0.8, fill: { color: C.GOLD } });
+  // Closing
+  const se = pres.addSlide(); se.background = { color: P.NV };
+  se.addShape(pres.shapes.RECTANGLE, { x: 3.5, y: 1.8, w: 0.06, h: 0.8, fill: { color: P.GD } });
   se.addText([
-    { text: "MACHADO MEYER ADVOGADOS", options: { fontSize: 14, color: C.CREAM, bold: true, charSpacing: 3, fontFace: "Calibri", breakLine: true } },
-    { text: "Área Trabalhista · Consultoria", options: { fontSize: 11, color: C.GRAY, fontFace: "Calibri" } }
+    { text: "MACHADO MEYER ADVOGADOS", options: { fontSize: 14, color: P.CR, bold: true, charSpacing: 3, fontFace: "Calibri", breakLine: true } },
+    { text: "Área Trabalhista · Consultoria", options: { fontSize: 11, color: P.GR, fontFace: "Calibri" } }
   ], { x: 3.8, y: 1.8, w: 5, h: 0.8, valign: "middle" });
-  se.addText("Documento gerado por IA · Uso interno\nSujeito à revisão do advogado responsável", { x: 2, y: 3.5, w: 6, h: 0.6, fontSize: 9, color: C.GRAY, align: "center", fontFace: "Calibri" });
-  goldBar(se);
+  se.addText("Documento gerado por IA · Uso interno\nSujeito à revisão do advogado responsável", { x: 2, y: 3.5, w: 6, h: 0.6, fontSize: 9, color: P.GR, align: "center", fontFace: "Calibri" });
+  bar(se);
 
   await pres.writeFile({ fileName: "Analise_PLR_Compliance.pptx" });
 }
@@ -541,4 +552,5 @@ export default function PLRAnalyzer() {
     </div>
   );
 }
+
 
