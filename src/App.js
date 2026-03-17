@@ -5,6 +5,19 @@ const MM_LOGO = ({ height = 100 }) => (
   <img src={process.env.PUBLIC_URL + "/mm-logo.png"} alt="Machado Meyer Advogados" style={{ height, objectFit: "contain" }} />
 );
 
+// ─── Required aspect titles (canonical list) ─────────────────────────────────
+const REQUIRED_ASPECTS = [
+  "Negociação com Sindicato ou Comissão Paritária",
+  "Periodicidade de Pagamento",
+  "Abrangência Territorial",
+  "Empregados Abrangidos",
+  "Vigência e Prazos",
+  "Data de Assinatura",
+  "Metas Claras e Objetivas",
+  "Pagamento a Diretores Estatutários",
+  "Empregados Dispensados ou Afastados",
+];
+
 const SYSTEM_PROMPT = `Você é um assistente jurídico especializado em análise de compliance de Programas de Participação nos Lucros ou Resultados (PLR) no Brasil, atuando na área consultiva trabalhista de um escritório de advocacia de grande porte.
 
 Seu papel é analisar acordos de PLR enviados pelo usuário e produzir análises jurídicas completas, identificando riscos trabalhistas, previdenciários e tributários.
@@ -44,6 +57,21 @@ CONCEITOS FUNDAMENTAIS DA PLR:
    - Comissão paritária deve dar ciência ao sindicato por escrito; sindicato tem 10 dias corridos para indicar representante
 
 ITENS A ANALISAR:
+
+REGRA OBRIGATÓRIA: O JSON de resposta DEVE conter EXATAMENTE 9 aspectos, um para cada item listado abaixo (a-i). Se o acordo for omisso sobre algum item, analise a omissão e seus riscos. NUNCA pule um item.
+
+Os 9 itens obrigatórios são:
+a) Negociação com Sindicato ou Comissão Paritária
+b) Periodicidade de Pagamento
+c) Abrangência Territorial
+d) Empregados Abrangidos
+e) Vigência e Prazos
+f) Empregados Dispensados ou Afastados
+g) Data de Assinatura
+h) Metas Claras e Objetivas
+i) Pagamento a Diretores Estatutários
+
+Se o seu JSON não contiver exatamente esses 9 itens, a resposta será considerada INVÁLIDA.
 
 ITENS OBJETIVOS (binários — ou cumpre 100 ou score 0, e se 0 o score final vai a 0):
 
@@ -96,6 +124,9 @@ h) METAS CLARAS E OBJETIVAS
 i) PAGAMENTO A DIRETORES ESTATUTÁRIOS
    - Refs: CSRF Ac. 9202-004.347; CSRF Ac. 9202-004.305
    - SCORE: Se inclui diretores sem vínculo = -10 no score de nuance. Se não inclui (correto) = 0.
+   - Se o acordo EXCLUI expressamente diretores estatutários não empregados, status = CONFORME, score = 100, e ajuste = 0.
+   - Se o acordo é OMISSO, analise os riscos da omissão.
+   - Se o acordo INCLUI diretores sem vínculo, status = NÃO CONFORME, score = 0, ajuste = -10.
 
 CÁLCULO DO SCORE:
 1. Se QUALQUER item objetivo = 0 → score final trabalhista E tributário = 0
@@ -140,7 +171,77 @@ FORMATO DE RESPOSTA — APENAS JSON válido, sem markdown:
   "scoreNuance": 0-100,
   "classificacaoTrabalhista": "ALTO RISCO"/"RISCO MODERADO"/"BAIXO RISCO"/"CONFORME",
   "classificacaoPrevidenciario": "ALTO RISCO"/"RISCO MODERADO"/"BAIXO RISCO"/"CONFORME"
-}`;
+}
+
+CHECKLIST FINAL ANTES DE RESPONDER:
+- [ ] Tenho exatamente 9 itens no array "aspectos"?
+- [ ] Incluí "Pagamento a Diretores Estatutários"?
+- [ ] "Empregados Dispensados ou Afastados" é o último item?
+- [ ] Calculei o score de nuance e mostrei a fórmula na conclusão?
+Se qualquer resposta for NÃO, corrija antes de enviar.`;
+
+// ─── Validation: ensure all 9 required aspects are present ───────────────────
+function validateAndPatchAspects(result) {
+  if (!result || !result.aspectos) return result;
+
+  const normalize = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+
+  const found = new Set(result.aspectos.map((a) => normalize(a.titulo)));
+
+  const MATCH_MAP = {
+    "Negociação com Sindicato ou Comissão Paritária": ["negociacao", "sindicato", "comissao paritaria"],
+    "Periodicidade de Pagamento": ["periodicidade", "pagamento"],
+    "Abrangência Territorial": ["abrangencia", "territorial"],
+    "Empregados Abrangidos": ["empregados abrangidos"],
+    "Vigência e Prazos": ["vigencia", "prazos"],
+    "Data de Assinatura": ["data de assinatura", "data assinatura"],
+    "Metas Claras e Objetivas": ["metas claras", "metas objetivas"],
+    "Pagamento a Diretores Estatutários": ["diretores", "estatutarios"],
+    "Empregados Dispensados ou Afastados": ["dispensados", "afastados"],
+  };
+
+  const missing = [];
+
+  for (const [canonical, keywords] of Object.entries(MATCH_MAP)) {
+    const exists = result.aspectos.some((a) => {
+      const norm = normalize(a.titulo);
+      return keywords.some((kw) => norm.includes(normalize(kw)));
+    });
+    if (!exists) missing.push(canonical);
+  }
+
+  if (missing.length > 0) {
+    console.warn("⚠ Aspectos omitidos pelo modelo:", missing);
+    for (const title of missing) {
+      const isDispensados = title.includes("Dispensados");
+      const isDiretores = title.includes("Diretores");
+      result.aspectos.push({
+        titulo: title,
+        tipo: isDiretores ? "nuance" : isDispensados ? "objetivo" : "objetivo",
+        status: "PARCIALMENTE CONFORME",
+        scoreItem: null,
+        riscoTrabalhista: "POSSÍVEL",
+        riscoPrevidenciario: isDispensados ? null : "POSSÍVEL",
+        fundamento: "Item omitido pela IA — revisão manual necessária",
+        analiseTrabalhista: "⚠ Este item não foi analisado automaticamente. A IA omitiu este aspecto da análise. Solicita-se revisão manual pelo advogado responsável para verificar a conformidade do acordo neste ponto.",
+        analisePrevidenciario: isDispensados ? null : "⚠ Item omitido — necessária revisão manual para avaliação do risco previdenciário/tributário.",
+        apenasTrabalista: isDispensados,
+      });
+    }
+  }
+
+  // Ensure "Empregados Dispensados ou Afastados" is last
+  const dispIdx = result.aspectos.findIndex((a) => {
+    const norm = normalize(a.titulo);
+    return norm.includes("dispensad") || norm.includes("afastad");
+  });
+  if (dispIdx >= 0 && dispIdx !== result.aspectos.length - 1) {
+    const [disp] = result.aspectos.splice(dispIdx, 1);
+    result.aspectos.push(disp);
+  }
+
+  return result;
+}
 
 // ─── Load pptxgenjs from CDN ─────────────────────────────────────────────────
 function loadPptxGen() {
@@ -232,7 +333,7 @@ async function generatePPTX(result) {
     sl.addText(a.titulo || "", { x: 0.85, y: 0.6, w: 5.5, h: 0.55, fontSize: 14, color: P.CR, bold: true, fontFace: "Georgia", valign: "middle", margin: 0 });
     sl.addShape(pres.shapes.RECTANGLE, { x: 6.5, y: 0.72, w: 1.8, h: 0.3, fill: { color: sc.bg } });
     sl.addText(sc.i + " " + a.status, { x: 6.5, y: 0.72, w: 1.8, h: 0.3, fontSize: 8, color: sc.tx, bold: true, align: "center", valign: "middle", charSpacing: 1, fontFace: "Calibri" });
-    if (a.scoreItem !== undefined) {
+    if (a.scoreItem !== undefined && a.scoreItem !== null) {
       sl.addText("Score: " + a.scoreItem + "/100", { x: 8.4, y: 0.72, w: 1.0, h: 0.3, fontSize: 10, color: P.GD, bold: true, align: "right", valign: "middle", fontFace: "Calibri", margin: 0 });
     }
 
@@ -406,7 +507,7 @@ export default function PLRAnalyzer() {
         const t = text.substring(0, 400000);
         userContent.push({ type: "text", text: `ACORDO COLETIVO DE PLR:\n\n${t}${text.length > 400000 ? "\n\n[... TRUNCADO ...]" : ""}` });
       }
-      userContent.push({ type: "text", text: "Analise o acordo coletivo de PLR acima conforme o checklist. Retorne o JSON conforme instruído." });
+      userContent.push({ type: "text", text: "Analise o acordo coletivo de PLR acima conforme o checklist. Retorne o JSON conforme instruído. LEMBRETE: o JSON DEVE conter exatamente 9 aspectos, incluindo obrigatoriamente 'Pagamento a Diretores Estatutários'." });
       const apiKey = process.env.REACT_APP_ANTHROPIC_API_KEY;
       if (!apiKey) throw new Error("API key não configurada.");
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -417,7 +518,10 @@ export default function PLRAnalyzer() {
       if (!response.ok) { const e = await response.json().catch(() => ({})); throw new Error(e.error?.message || `Erro: ${response.status}`); }
       const data = await response.json();
       const raw = data.content.map(i => i.text || "").join("");
-      setResult(JSON.parse(raw.replace(/```json|```/g, "").trim()));
+      let parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      // Validate and patch missing aspects
+      parsed = validateAndPatchAspects(parsed);
+      setResult(parsed);
       setStep("result");
     } catch (err) { setError(err.message || "Erro desconhecido."); setStep("upload"); }
     finally { setLoading(false); }
@@ -448,16 +552,18 @@ export default function PLRAnalyzer() {
 
   const AspectCard = ({ aspecto: a }) => {
     const cfg = statusConfig[a.status] || statusConfig["PARCIALMENTE CONFORME"];
+    const isPlaceholder = a.fundamento?.includes("omitido pela IA");
     return (
-      <div style={{ background: "#fff", borderRadius: "4px", border: "1px solid #E8E2D9", borderLeft: `4px solid ${cfg.border}`, padding: "24px 28px" }}>
+      <div style={{ background: isPlaceholder ? "#FFFBEB" : "#fff", borderRadius: "4px", border: `1px solid ${isPlaceholder ? "#FCD34D" : "#E8E2D9"}`, borderLeft: `4px solid ${isPlaceholder ? "#F59E0B" : cfg.border}`, padding: "24px 28px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", marginBottom: "16px" }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
               <div style={{ color: "#0A1628", fontWeight: "700", fontSize: "15px" }}>{a.titulo}</div>
               <span style={{ background: cfg.bg, color: cfg.color, padding: "3px 12px", borderRadius: "2px", fontSize: "10px", letterSpacing: "1px", fontWeight: "700", whiteSpace: "nowrap" }}>{cfg.icon} {a.status}</span>
+              {isPlaceholder && <span style={{ background: "#FEF3C7", color: "#92400E", padding: "3px 10px", borderRadius: "2px", fontSize: "9px", letterSpacing: "0.5px", fontWeight: "700", whiteSpace: "nowrap" }}>⚠ REVISÃO MANUAL</span>}
             </div>
             {a.fundamento && <div style={{ color: "#9CA3AF", fontSize: "11px" }}>{a.fundamento}</div>}
-            {a.scoreItem !== undefined && <div style={{ color: "#B8962E", fontSize: "11px", fontWeight: "700", marginTop: "4px" }}>Score: {a.scoreItem}/100</div>}
+            {a.scoreItem !== undefined && a.scoreItem !== null && <div style={{ color: "#B8962E", fontSize: "11px", fontWeight: "700", marginTop: "4px" }}>Score: {a.scoreItem}/100</div>}
           </div>
           <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
             <RiskBox label="TRABALHISTA" risk={a.riscoTrabalhista} />
