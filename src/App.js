@@ -612,10 +612,14 @@ export default function PLRAnalyzer() {
       }
       userContent.push({ type: "text", text: "Analise o acordo coletivo de PLR acima conforme o checklist. Retorne APENAS o JSON conforme instruído, sem markdown. LEMBRETE: o JSON DEVE conter exatamente 9 aspectos, incluindo obrigatoriamente 'Pagamento a Diretores Estatutários'. Verifique se é Ltda ou S/A. Cite as datas extraídas do documento na análise de Data de Assinatura." });
 
+      const apiKey = process.env.REACT_APP_ANTHROPIC_API_KEY;
+      if (!apiKey) throw new Error("API key não configurada. Verifique a variável REACT_APP_ANTHROPIC_API_KEY.");
+
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-api-key": apiKey,
           "anthropic-version": "2023-06-01",
           "anthropic-dangerous-direct-browser-access": "true",
         },
