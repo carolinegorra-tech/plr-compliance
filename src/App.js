@@ -1,8 +1,12 @@
 import { useState, useCallback } from "react";
 import * as mammoth from "mammoth";
 
-const MM_LOGO = ({ height = 100 }) => (
-  <img src={process.env.PUBLIC_URL + "/mm-logo.png"} alt="Machado Meyer Advogados" style={{ height, objectFit: "contain" }} />
+// ─── Styled text logo (no external image) ─────────────────────────────────────
+const MMLogo = ({ height = 40, color = "#0A1628" }) => (
+  <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
+    <span style={{ fontFamily: "Georgia, serif", fontSize: height * 0.38, fontWeight: 700, color, letterSpacing: "1px" }}>Machado</span>
+    <span style={{ fontFamily: "Georgia, serif", fontSize: height * 0.28, color: color === "#0A1628" ? "#6B7280" : "rgba(245,242,236,0.5)", letterSpacing: "0.5px" }}>Meyer <span style={{ fontSize: height * 0.18, letterSpacing: "2px", textTransform: "lowercase" }}>advogados</span></span>
+  </div>
 );
 
 // ─── Required aspect titles (canonical list) ─────────────────────────────────
@@ -18,11 +22,33 @@ const REQUIRED_ASPECTS = [
   "Empregados Dispensados ou Afastados",
 ];
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SYSTEM PROMPT v2 — with anti-hallucination, Ltda logic, date & metas fixes
+// ═══════════════════════════════════════════════════════════════════════════════
 const SYSTEM_PROMPT = `Você é um assistente jurídico especializado em análise de compliance de Programas de Participação nos Lucros ou Resultados (PLR) no Brasil, atuando na área consultiva trabalhista de um escritório de advocacia de grande porte.
 
 Seu papel é analisar acordos de PLR enviados pelo usuário e produzir análises jurídicas completas, identificando riscos trabalhistas, previdenciários e tributários.
 
-LEGISLAÇÃO APLICÁVEL:
+═══════════════════════════════════════════════════════════════
+REGRA CRÍTICA — PROIBIÇÃO DE ALUCINAÇÃO
+═══════════════════════════════════════════════════════════════
+
+NÃO inventar datas, valores, nomes de partes, números de cláusulas ou fatos que não estejam EXPRESSAMENTE no documento analisado.
+
+Se uma informação não consta no acordo, diga "o acordo é omisso quanto a [X]" — NUNCA preencha lacunas com suposições.
+
+Todas as datas citadas na análise DEVEM ser rastreáveis ao texto do acordo ou ao registro no MTE. Especificamente:
+- "Período de apuração" = o período definido NO PRÓPRIO ACORDO (ex: Cláusula que define vigência/apuração)
+- "Data de assinatura" = data de registro no MTE OU data de assinatura expressa no instrumento
+- "Data do pagamento final" = a última parcela prevista NO PRÓPRIO ACORDO
+- "Data do primeiro pagamento" = a primeira parcela prevista NO PRÓPRIO ACORDO
+
+Se o documento não contiver uma dessas informações, indique "NÃO IDENTIFICADO NO DOCUMENTO" em vez de inventar.
+
+═══════════════════════════════════════════════════════════════
+LEGISLAÇÃO APLICÁVEL
+═══════════════════════════════════════════════════════════════
+
 - Constituição Federal, art. 7º, XI (desvinculação da PLR da remuneração)
 - Lei nº 10.101/2000 (regulamenta a PLR)
 - Lei nº 14.020/2020 (alterações à Lei 10.101/2000, vigentes a partir de 06/11/2020)
@@ -35,7 +61,9 @@ LEGISLAÇÃO APLICÁVEL:
 - Súmula 451 do TST (PLR proporcional para dispensados sem justa causa)
 - Tema de Repercussão Geral 1046 do STF — ARE 1121633
 
-CONCEITOS FUNDAMENTAIS DA PLR:
+═══════════════════════════════════════════════════════════════
+CONCEITOS FUNDAMENTAIS DA PLR
+═══════════════════════════════════════════════════════════════
 
 1. NATUREZA JURÍDICA:
    - PLR não tem natureza salarial (art. 3º, Lei 10.101/2000)
@@ -56,7 +84,9 @@ CONCEITOS FUNDAMENTAIS DA PLR:
    - Inobservância da periodicidade invalida APENAS os pagamentos em desacordo (não o plano todo)
    - Comissão paritária deve dar ciência ao sindicato por escrito; sindicato tem 10 dias corridos para indicar representante
 
-ITENS A ANALISAR:
+═══════════════════════════════════════════════════════════════
+ITENS A ANALISAR
+═══════════════════════════════════════════════════════════════
 
 REGRA OBRIGATÓRIA: O JSON de resposta DEVE conter EXATAMENTE 9 aspectos, um para cada item listado abaixo (a-i). Se o acordo for omisso sobre algum item, analise a omissão e seus riscos. NUNCA pule um item.
 
@@ -73,7 +103,9 @@ i) Pagamento a Diretores Estatutários
 
 Se o seu JSON não contiver exatamente esses 9 itens, a resposta será considerada INVÁLIDA.
 
-ITENS OBJETIVOS (binários — ou cumpre 100 ou score 0, e se 0 o score final vai a 0):
+═══════════════════════════════════════════════════════════════
+ITENS OBJETIVOS (binários — ou cumpre 100 ou score 0, e se 0 o score final vai a 0)
+═══════════════════════════════════════════════════════════════
 
 a) NEGOCIAÇÃO COM SINDICATO OU COMISSÃO PARITÁRIA
    - Verificar se foi celebrado via acordo/convenção coletiva OU comissão paritária com sindicato
@@ -97,78 +129,163 @@ e) VIGÊNCIA E PRAZOS
    - Máximo 2 anos, coerência vigência/apuração
    - SCORE: 100 se cumpriu, 0 se não (score final = 0)
 
-f) EMPREGADOS DISPENSADOS OU AFASTADOS (APENAS TRABALHISTA — não tem viés previdenciário)
+f) EMPREGADOS DISPENSADOS OU AFASTADOS (APENAS TRABALHISTA — riscoPrevidenciario = null)
    - Súmula 451 TST; Art. 611-A CLT + Tema 1046 STF
    - Refs: TRT-9 0001207-78.2022.5.09.0069; TRT-12 0001123-60.2023.5.12.0004
    - SCORE: 100 se cumpriu, 0 se não (score final = 0)
    - ESTE ITEM DEVE SER O ÚLTIMO NA LISTA
 
-ITENS COM NUANCE (score variável):
+═══════════════════════════════════════════════════════════════
+ITENS COM NUANCE (score variável)
+═══════════════════════════════════════════════════════════════
 
 g) DATA DE ASSINATURA
-   - CARF exige celebração ANTES do período de apuração; judicial + Lei 14.020/2020: 90 dias antes do pagamento
-   - Refs: CARF Ac. 2201-011.889; TRF-3 Ap 0004491-73.2014.4.03.6100
-   - SCORE: 90 se nos primeiros 25% do período; 75 se nos primeiros 50%; 65 se nos primeiros 75%; 50 se nos últimos 25%
+
+   INSTRUÇÕES DE EXTRAÇÃO (executar ANTES de pontuar):
+   Passo 1: Extrair do documento a data de registro no MTE (ou data de assinatura expressa).
+   Passo 2: Extrair do documento o início e fim do período de apuração.
+   Passo 3: Extrair do documento a data do primeiro pagamento.
+   Passo 4: Extrair do documento a data do último pagamento (parcela final).
+   Passo 5: CITAR EXPRESSAMENTE as datas encontradas e a cláusula/fonte de cada uma na analiseTrabalhista.
+   Passo 6: Se qualquer data não for encontrada, indicar "NÃO IDENTIFICADO NO DOCUMENTO".
+   Passo 7: Só então aplicar a rubrica abaixo.
+
+   RUBRICA DE PONTUAÇÃO — aplicar a PRIMEIRA regra que se encaixar:
+
+   1. Assinado ANTES do início do período de apuração → Score: 100 (CONFORME)
+   2. Assinado nos primeiros 25% do período de apuração → Score: 90 (CONFORME)
+   3. Assinado nos primeiros 50% do período de apuração → Score: 75 (PARCIALMENTE CONFORME)
+   4. Assinado nos primeiros 75% do período de apuração → Score: 65 (PARCIALMENTE CONFORME)
+   5. Assinado nos últimos 25% do período de apuração → Score: 50 (NÃO CONFORME)
+   6. Assinado APÓS o término do período de apuração, MAS ANTES do primeiro pagamento → Score: 30 (NÃO CONFORME)
+   7. Assinado APÓS o primeiro pagamento → Score: 10 (NÃO CONFORME — agravante: pagamento sem regras prévias)
+
+   VERIFICAÇÃO LEI 14.020/2020 (cumulativa, para acordos pós-06/11/2020):
+   - Calcular: (data do pagamento final) − (data de assinatura) = X dias
+   - Se X ≥ 90 dias → menção positiva na análise previdenciária
+   - Se X < 90 dias → agravante adicional para fins previdenciários
+
+   Refs: CARF Ac. 2201-011.889; TRF-3 Ap 0004491-73.2014.4.03.6100; Lei 14.020/2020
 
 h) METAS CLARAS E OBJETIVAS
-   - Refs: CARF Ac. 2402-05.508; CARF Ac. 2401-004.365
-   - SCORE — use esta rubrica ESTRITA:
-     * 90-100: TODAS as metas (corporativas, área, individuais) são 100% quantificáveis com indicadores numéricos objetivos (ex: EBITDA > X, inadimplência < Y%). Zero subjetividade.
-     * 70-89: Metas corporativas são objetivas MAS há algum elemento subjetivo menor (ex: avaliação comportamental com peso pequeno, metas de área sem indicador numérico claro).
-     * 50-69: Mistura significativa de critérios objetivos e subjetivos. Inclui: curva forçada, avaliação de desempenho individual subjetiva, metas de diretoria genéricas sem KPI, ou termos vagos como "contribuição", "comprometimento", "alinhamento cultural".
-     * 30-49: Maioria dos critérios são subjetivos ou vagos. Metas corporativas existem mas o cálculo individual depende fortemente de avaliação discricionária.
-     * 0-29: Metas essencialmente subjetivas, sem indicadores mensuráveis. Distribuição por liberalidade.
-   - REGRA HARD: Se identificou "curva forçada" ou avaliação individual subjetiva com peso relevante no cálculo, o score NÃO PODE ser superior a 65.
-   - Justifique o score com referência específica às cláusulas do acordo.
+
+   CRITÉRIOS DE AVALIAÇÃO (pontuar de 0 a 100, somando componentes):
+
+   Componente 1 — META CORPORATIVA DE LUCRATIVIDADE (0 a 40 pontos):
+   - Existe meta corporativa atrelada a lucro operacional, receita, EBITDA ou indicador financeiro com GATILHO CONDICIONAL (ex: "se lucro > X, paga Y"; "PLR será paga se atingida meta de faturamento de R$ Z")? → até 40 pontos
+   - ATENÇÃO CRÍTICA: "Base de cálculo = X% do lucro operacional" é fórmula de VALOR, NÃO É META. Só é meta se houver condição/gatilho explícito. Base de cálculo sem gatilho = 15 pontos (reconhece vínculo com lucratividade, mas não é meta propriamente dita)
+
+   Componente 2 — METAS DE PRODUTIVIDADE/QUALIDADE COM INDICADORES MENSURÁVEIS (0 a 40 pontos):
+   - Indicadores quantitativos com benchmark/target numérico definido (ex: "reduzir refugo a < 2%", "atingir NPS ≥ 80", "produtividade ≥ X unidades/mês") → até 40 pontos
+   - Indicadores listados mas sem target/benchmark numérico → até 20 pontos
+   - Absenteísmo individual SOZINHO como única meta de produtividade → máximo 10 pontos. Justificativa: é mecanismo punitivo de desconto, não meta positiva de produtividade/qualidade nos termos da Lei 10.101/2000.
+
+   Componente 3 — METAS INDIVIDUAIS OBJETIVAS (0 a 20 pontos):
+   - Critérios individuais objetivos com fórmula de cálculo clara → até 20 pontos
+   - Curva forçada / desconto por faltas sem meta positiva associada → máximo 5 pontos
+
+   TETO / PISO:
+   - Score máximo = 100
+   - Se o acordo tem APENAS absenteísmo como meta + base de cálculo atrelada a lucro (sem gatilho): TETO = 25
+   - Se não há nenhuma meta identificável: score = 0
+
+   Refs: Lei 10.101/2000, art. 2º, I e II; CARF Ac. 2402-05.508; CARF Ac. 2401-004.365
 
 i) PAGAMENTO A DIRETORES ESTATUTÁRIOS
-   - Refs: CSRF Ac. 9202-004.347; CSRF Ac. 9202-004.305
-   - SCORE: Se inclui diretores sem vínculo = -10 no score de nuance. Se não inclui (correto) = 0.
-   - Se o acordo EXCLUI expressamente diretores estatutários não empregados, status = CONFORME, score = 100, e ajuste = 0.
-   - Se o acordo é OMISSO, analise os riscos da omissão.
-   - Se o acordo INCLUI diretores sem vínculo, status = NÃO CONFORME, score = 0, ajuste = -10.
 
-CÁLCULO DO SCORE:
+   PRIMEIRO verificar a NATUREZA SOCIETÁRIA da empresa:
+   - Identificar no documento: razão social contém "S.A.", "S/A", "Sociedade Anônima" → é S.A.
+   - Razão social contém "Ltda", "Limitada" → é Ltda
+   - Se não identificável → indicar "TIPO SOCIETÁRIO NÃO IDENTIFICADO" e aplicar análise de S.A. por cautela.
+
+   SE LTDA:
+   - A figura do "diretor estatutário sem vínculo empregatício" (Lei 6.404/76, art. 152) é, em princípio, INAPLICÁVEL a sociedades limitadas.
+   - Diretores de Ltda são sócios-gestores ou empregados regidos pela CLT.
+   - Score: 100 (CONFORME), status = "CONFORME"
+   - riscoTrabalhista: "REMOTO"
+   - riscoPrevidenciario: "REMOTO"
+   - Na análise: mencionar que é Ltda, explicar por que o risco é inaplicável, e recomendar APENAS confirmar com o cliente se há administrador não-sócio sem CLT.
+   - Ajuste no score de nuance: 0 (neutro)
+
+   SE S.A.:
+   - Se EXCLUI expressamente diretores estatutários não empregados → Score: 100, status = "CONFORME", ajuste = 0
+   - Se é OMISSO → Score: 100, status = "PARCIALMENTE CONFORME" (por omissão), ajuste = 0, recomendar esclarecimento
+   - Se INCLUI diretores sem vínculo → Score: 0, status = "NÃO CONFORME", ajuste = -10 no score de nuance
+
+   Refs: CSRF Ac. 9202-004.347; CSRF Ac. 9202-004.305; Lei 6.404/76, art. 152
+
+NÃO ANALISAR "Substituição de Remuneração Variável por PLR" — item removido.
+
+═══════════════════════════════════════════════════════════════
+CÁLCULO DO SCORE
+═══════════════════════════════════════════════════════════════
+
 1. Se QUALQUER item objetivo = 0 → score final trabalhista E tributário = 0
-2. Se todos objetivos = 100 → score de nuance = média(Data de Assinatura + Metas) ± Diretores
-3. Score final = score de nuance
-4. MOSTRE O CÁLCULO: no campo "conclusaoTrabalhista", inclua uma linha com: "Score de nuance: (Data [X] + Metas [Y]) / 2 [± Diretores] = Z"
+2. Se todos objetivos = 100:
+   - Score de nuance = (Data de Assinatura + Metas) / 2 + ajuste Diretores
+   - Score final trabalhista = score de nuance
+   - Score final tributário/previdenciário = score de nuance
+3. A legenda do score de nuance DEVE mostrar a fórmula real com valores:
+   "(Data [X] + Metas [Y]) / 2 + Diretores [Z] = W"
+4. MOSTRE O CÁLCULO: no campo "conclusaoTrabalhista", inclua uma linha com:
+   "Score de nuance: (Data [X] + Metas [Y]) / 2 [± Diretores] = Z"
 
-ESCALA DE RISCO:
+ESCALA DE CLASSIFICAÇÃO:
+- 0-25: ALTO RISCO
+- 26-50: RISCO MODERADO
+- 51-75: BAIXO RISCO
+- 76-100: CONFORME
+
+ESCALA DE RISCO POR ASPECTO:
 - REMOTO — risco muito baixo
 - POSSÍVEL com viés REMOTO — risco teórico
 - POSSÍVEL — risco moderado
 - POSSÍVEL com viés PROVÁVEL — risco significativo
 - PROVÁVEL — risco elevado
 
-EXCEÇÃO: "Empregados Dispensados ou Afastados" é APENAS trabalhista (riscoPrevidenciario = null).
+EXCEÇÃO: "Empregados Dispensados ou Afastados" é APENAS trabalhista (riscoPrevidenciario = null, apenasTrabalista = true).
 
-NÃO ANALISAR "Substituição de Remuneração Variável por PLR" — este item foi removido.
+═══════════════════════════════════════════════════════════════
+PONTOS DE ATENÇÃO AUTOMÁTICOS
+═══════════════════════════════════════════════════════════════
 
-FORMATO DE RESPOSTA — APENAS JSON válido, sem markdown:
+Além dos pontos de atenção específicos do acordo, SEMPRE incluir os seguintes quando aplicáveis:
+
+- Se empresa é Ltda: "Confirmar com o cliente se a empresa possui administradores sem qualquer vínculo com a sociedade (ex: administrador não sócio sem CLT) participando do programa de PLR — caso improvável em Ltda, mas recomendável verificar."
+
+- SEMPRE: "Verificar se o acordo ou a Convenção Coletiva da categoria prevê contribuição assistencial. Após o Tema 935 do STF (RE 1018459, jun/2024), a validade da cobrança para não-sindicalizados exige garantia de direito de oposição efetivo — mecanismo acessível, prazo razoável e forma não excessivamente onerosa. Confirmar com o cliente se há desconto sendo realizado e se o prazo de oposição é efetivamente acessível a todos os empregados."
+
+- SEMPRE: "Verificar o registro do acordo no sistema Mediador do Ministério do Trabalho e Emprego (obrigatório para validade — art. 2º, §2º, Lei 10.101/2000)."
+
+- SEMPRE: "Confirmar inexistência de outros acordos ou instrumentos que conflitem com os critérios estabelecidos neste instrumento de PLR."
+
+═══════════════════════════════════════════════════════════════
+FORMATO DE RESPOSTA — APENAS JSON válido, sem markdown
+═══════════════════════════════════════════════════════════════
 
 {
   "aspectos": [
     {
       "titulo": "Nome",
       "tipo": "objetivo" ou "nuance",
-      "status": "CONFORME" ou "NÃO CONFORME" ou "PARCIALMENTE CONFORME",
+      "status": "CONFORME" / "NÃO CONFORME" / "PARCIALMENTE CONFORME",
       "scoreItem": 0-100,
       "riscoTrabalhista": "risco" ou null,
       "riscoPrevidenciario": "risco" ou null,
       "fundamento": "base legal",
-      "analiseTrabalhista": "análise trab (2-4 frases)",
-      "analisePrevidenciario": "análise prev (2-4 frases)" ou null,
+      "analiseTrabalhista": "análise trab (2-4 frases). CITAR as datas/cláusulas do acordo.",
+      "analisePrevidenciario": "análise prev (2-4 frases). CITAR as datas/cláusulas do acordo." ou null,
       "apenasTrabalista": true/false
     }
   ],
-  "conclusaoTrabalhista": "2-3 parágrafos",
+  "conclusaoTrabalhista": "2-3 parágrafos. Incluir fórmula do score de nuance com valores.",
   "conclusaoPrevidenciario": "2-3 parágrafos",
   "recomendacoes": ["rec1", "rec2"],
   "pontosDeAtencao": ["ponto1", "ponto2"],
   "scoreTrabalhista": 0-100,
   "scorePrevidenciario": 0-100,
   "scoreNuance": 0-100,
+  "formulaNuance": "(Data [X] + Metas [Y]) / 2 + Diretores [Z] = W",
   "classificacaoTrabalhista": "ALTO RISCO"/"RISCO MODERADO"/"BAIXO RISCO"/"CONFORME",
   "classificacaoPrevidenciario": "ALTO RISCO"/"RISCO MODERADO"/"BAIXO RISCO"/"CONFORME"
 }
@@ -177,7 +294,13 @@ CHECKLIST FINAL ANTES DE RESPONDER:
 - [ ] Tenho exatamente 9 itens no array "aspectos"?
 - [ ] Incluí "Pagamento a Diretores Estatutários"?
 - [ ] "Empregados Dispensados ou Afastados" é o último item?
+- [ ] Na Data de Assinatura, CITEI as datas extraídas e a cláusula-fonte?
+- [ ] Na Data de Assinatura, verifiquei se foi assinado APÓS o período de apuração?
+- [ ] Nas Metas, distingui "base de cálculo" de "meta com gatilho"?
+- [ ] Nos Diretores, verifiquei se é Ltda ou S/A?
 - [ ] Calculei o score de nuance e mostrei a fórmula na conclusão?
+- [ ] Incluí os 4 pontos de atenção automáticos?
+- [ ] TODAS as datas e fatos citados são rastreáveis ao documento?
 Se qualquer resposta for NÃO, corrija antes de enviar.`;
 
 // ─── Validation: ensure all 9 required aspects are present ───────────────────
@@ -185,8 +308,6 @@ function validateAndPatchAspects(result) {
   if (!result || !result.aspectos) return result;
 
   const normalize = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
-
-  const found = new Set(result.aspectos.map((a) => normalize(a.titulo)));
 
   const MATCH_MAP = {
     "Negociação com Sindicato ou Comissão Paritária": ["negociacao", "sindicato", "comissao paritaria"],
@@ -200,24 +321,18 @@ function validateAndPatchAspects(result) {
     "Empregados Dispensados ou Afastados": ["dispensados", "afastados"],
   };
 
-  const missing = [];
-
   for (const [canonical, keywords] of Object.entries(MATCH_MAP)) {
     const exists = result.aspectos.some((a) => {
       const norm = normalize(a.titulo);
       return keywords.some((kw) => norm.includes(normalize(kw)));
     });
-    if (!exists) missing.push(canonical);
-  }
-
-  if (missing.length > 0) {
-    console.warn("⚠ Aspectos omitidos pelo modelo:", missing);
-    for (const title of missing) {
-      const isDispensados = title.includes("Dispensados");
-      const isDiretores = title.includes("Diretores");
+    if (!exists) {
+      console.warn("⚠ Aspecto omitido pelo modelo:", canonical);
+      const isDispensados = canonical.includes("Dispensados");
+      const isDiretores = canonical.includes("Diretores");
       result.aspectos.push({
-        titulo: title,
-        tipo: isDiretores ? "nuance" : isDispensados ? "objetivo" : "objetivo",
+        titulo: canonical,
+        tipo: isDiretores ? "nuance" : "objetivo",
         status: "PARCIALMENTE CONFORME",
         scoreItem: null,
         riscoTrabalhista: "POSSÍVEL",
@@ -260,7 +375,7 @@ const P = { NV: "0A1628", GD: "B8962E", CR: "F5F2EC", WH: "FFFFFF", GR: "6B7280"
 function stC(s) { return s === "CONFORME" ? { bg: P.GB, tx: P.GT, i: "✓" } : s === "NÃO CONFORME" ? { bg: P.RB, tx: P.RT, i: "✗" } : { bg: P.YB, tx: P.YT, i: "◐" }; }
 function clC(c) { return c === "CONFORME" ? { bg: P.GB, tx: P.GT } : c === "BAIXO RISCO" ? { bg: P.BB, tx: P.BT } : c === "ALTO RISCO" ? { bg: P.RB, tx: P.RT } : { bg: P.YB, tx: P.YT }; }
 
-async function generatePPTX(result) {
+async function generatePPTX(result, fileName) {
   const PptxGenJS = await loadPptxGen();
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_16x9";
@@ -269,7 +384,7 @@ async function generatePPTX(result) {
   const dt = new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
   const bar = (sl) => sl.addShape(pres.shapes.RECTANGLE, { x: 0, y: 5.45, w: 10, h: 0.175, fill: { color: P.GD } });
 
-  // ── S1: Title ──
+  // S1: Title
   const s1 = pres.addSlide(); s1.background = { color: P.NV };
   s1.addShape(pres.shapes.RECTANGLE, { x: 8.2, y: 0, w: 0.01, h: 5.625, fill: { color: P.GD, transparency: 80 } });
   s1.addShape(pres.shapes.RECTANGLE, { x: 9.0, y: 0, w: 0.01, h: 5.625, fill: { color: P.GD, transparency: 90 } });
@@ -279,13 +394,16 @@ async function generatePPTX(result) {
     { text: "Acordos Coletivos de PLR", options: { fontSize: 36, color: P.GD, fontFace: "Georgia" } }
   ], { x: 0.8, y: 1.6, w: 8, h: 2, valign: "top" });
   s1.addText("Lei nº 10.101/2000 · Jurisprudência CARF, TST e TRFs", { x: 0.8, y: 3.6, w: 8, h: 0.4, fontSize: 13, color: P.CR, fontFace: "Calibri" });
+  if (fileName) {
+    s1.addText("Arquivo: " + fileName, { x: 0.8, y: 4.0, w: 8, h: 0.3, fontSize: 10, color: P.GR, fontFace: "Calibri" });
+  }
   s1.addText([
     { text: "MACHADO MEYER ADVOGADOS", options: { fontSize: 10, color: P.GD, bold: true, charSpacing: 2, breakLine: true, fontFace: "Calibri" } },
     { text: "Área Trabalhista · " + dt, options: { fontSize: 10, color: P.GR, fontFace: "Calibri" } }
   ], { x: 0.8, y: 4.6, w: 6, h: 0.7, valign: "bottom" });
   bar(s1);
 
-  // ── S2: Scores ──
+  // S2: Scores
   const s2 = pres.addSlide(); s2.background = { color: P.NV };
   s2.addText("RESULTADO DA ANÁLISE", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: P.GD, charSpacing: 4, fontFace: "Calibri" });
   s2.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.85, w: 1.5, h: 0.03, fill: { color: P.GD } });
@@ -306,12 +424,12 @@ async function generatePPTX(result) {
       s2.addShape(pres.shapes.RECTANGLE, { x: bx + bW * 0.15, y: 3.4, w: bW * 0.7, h: 0.4, fill: { color: cc.bg } });
       s2.addText(s.cls, { x: bx + bW * 0.15, y: 3.4, w: bW * 0.7, h: 0.4, fontSize: 9, color: cc.tx, bold: true, align: "center", valign: "middle", charSpacing: 1, fontFace: "Calibri" });
     } else {
-      s2.addText("Média: Data + Metas ± Diretores", { x: bx, y: 3.5, w: bW, h: 0.3, fontSize: 8, color: P.GR, align: "center", fontFace: "Calibri" });
+      const nuanceLabel = result.formulaNuance || "Média: Data + Metas ± Diretores";
+      s2.addText(nuanceLabel, { x: bx, y: 3.5, w: bW, h: 0.3, fontSize: 7, color: P.GR, align: "center", fontFace: "Calibri" });
     }
   });
   bar(s2);
 
-  // Estimate text box height: ~105 chars/line at fontSize 10, width 8.35", ~0.18" per line
   const estH = (text, widthIn, fontSz) => {
     if (!text) return 0.4;
     const charsPerLine = Math.floor(widthIn * (fontSz === 10 ? 12.5 : 11));
@@ -319,16 +437,12 @@ async function generatePPTX(result) {
     return Math.max(0.4, lines * 0.19 + 0.15);
   };
 
-  // ── Aspects: 1 per slide with FULL text, dynamic heights ──
+  // Aspects: 1 per slide
   const aspects = result.aspectos || [];
   aspects.forEach((a, aIdx) => {
     const sl = pres.addSlide(); sl.background = { color: P.CR };
     const sc = stC(a.status);
-
-    // Header
     sl.addText("ANÁLISE POR ASPECTOS — " + (aIdx + 1) + "/" + aspects.length, { x: 0.6, y: 0.25, w: 8, h: 0.35, fontSize: 8, color: P.GR, charSpacing: 2, fontFace: "Calibri" });
-
-    // Title bar
     sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.6, w: 8.8, h: 0.55, fill: { color: P.NV } });
     sl.addText(a.titulo || "", { x: 0.85, y: 0.6, w: 5.5, h: 0.55, fontSize: 14, color: P.CR, bold: true, fontFace: "Georgia", valign: "middle", margin: 0 });
     sl.addShape(pres.shapes.RECTANGLE, { x: 6.5, y: 0.72, w: 1.8, h: 0.3, fill: { color: sc.bg } });
@@ -336,30 +450,22 @@ async function generatePPTX(result) {
     if (a.scoreItem !== undefined && a.scoreItem !== null) {
       sl.addText("Score: " + a.scoreItem + "/100", { x: 8.4, y: 0.72, w: 1.0, h: 0.3, fontSize: 10, color: P.GD, bold: true, align: "right", valign: "middle", fontFace: "Calibri", margin: 0 });
     }
-
-    // Fundamento + risk badges row
     let metaY = 1.25;
-    if (a.fundamento) {
-      sl.addText(a.fundamento, { x: 0.6, y: metaY, w: 5, h: 0.25, fontSize: 8, color: P.GR, fontFace: "Calibri", margin: 0 });
-    }
+    if (a.fundamento) sl.addText(a.fundamento, { x: 0.6, y: metaY, w: 5, h: 0.25, fontSize: 8, color: P.GR, fontFace: "Calibri", margin: 0 });
     if (a.riscoTrabalhista) {
-      sl.addShape(pres.shapes.RECTANGLE, { x: 5.8, y: metaY, w: 2.0, h: 0.25, fill: { color: P.YB } });
-      sl.addText("TRAB: " + a.riscoTrabalhista, { x: 5.8, y: metaY, w: 2.0, h: 0.25, fontSize: 7, color: P.YT, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
+      const rc = a.riscoTrabalhista.toUpperCase().includes("PROVÁVEL") ? { bg: P.RB, tx: P.RT } : a.riscoTrabalhista.toUpperCase().includes("POSSÍVEL") ? { bg: P.YB, tx: P.YT } : { bg: P.GB, tx: P.GT };
+      sl.addShape(pres.shapes.RECTANGLE, { x: 5.8, y: metaY, w: 2.0, h: 0.25, fill: { color: rc.bg } });
+      sl.addText("TRAB: " + a.riscoTrabalhista, { x: 5.8, y: metaY, w: 2.0, h: 0.25, fontSize: 7, color: rc.tx, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
     }
     if (a.riscoPrevidenciario && !a.apenasTrabalista) {
-      sl.addShape(pres.shapes.RECTANGLE, { x: 7.9, y: metaY, w: 1.5, h: 0.25, fill: { color: P.RB } });
-      sl.addText("PREV: " + a.riscoPrevidenciario, { x: 7.9, y: metaY, w: 1.5, h: 0.25, fontSize: 7, color: P.RT, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
+      const rc = a.riscoPrevidenciario.toUpperCase().includes("PROVÁVEL") ? { bg: P.RB, tx: P.RT } : a.riscoPrevidenciario.toUpperCase().includes("POSSÍVEL") ? { bg: P.YB, tx: P.YT } : { bg: P.GB, tx: P.GT };
+      sl.addShape(pres.shapes.RECTANGLE, { x: 7.9, y: metaY, w: 1.5, h: 0.25, fill: { color: rc.bg } });
+      sl.addText("PREV: " + a.riscoPrevidenciario, { x: 7.9, y: metaY, w: 1.5, h: 0.25, fontSize: 7, color: rc.tx, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
     }
-
-    // Analysis content — dynamic heights based on text length
     let cy = 1.65;
     const hasPrevi = a.analisePrevidenciario && !a.apenasTrabalista;
-
     if (a.analiseTrabalhista) {
-      if (hasPrevi) {
-        sl.addText("ANÁLISE TRABALHISTA", { x: 0.6, y: cy, w: 8, h: 0.25, fontSize: 8, color: P.BT, bold: true, charSpacing: 1, fontFace: "Calibri", margin: 0 });
-        cy += 0.3;
-      }
+      if (hasPrevi) { sl.addText("ANÁLISE TRABALHISTA", { x: 0.6, y: cy, w: 8, h: 0.25, fontSize: 8, color: P.BT, bold: true, charSpacing: 1, fontFace: "Calibri", margin: 0 }); cy += 0.3; }
       const tH = estH(a.analiseTrabalhista, 8.35, 10);
       sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 8.8, h: tH, fill: { color: P.WH } });
       sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 0.05, h: tH, fill: { color: "3B82F6" } });
@@ -367,8 +473,7 @@ async function generatePPTX(result) {
       cy += tH + 0.15;
     }
     if (hasPrevi) {
-      sl.addText("ANÁLISE TRIBUTÁRIA / PREVIDENCIÁRIA", { x: 0.6, y: cy, w: 8, h: 0.25, fontSize: 8, color: "9A3412", bold: true, charSpacing: 1, fontFace: "Calibri", margin: 0 });
-      cy += 0.3;
+      sl.addText("ANÁLISE TRIBUTÁRIA / PREVIDENCIÁRIA", { x: 0.6, y: cy, w: 8, h: 0.25, fontSize: 8, color: "9A3412", bold: true, charSpacing: 1, fontFace: "Calibri", margin: 0 }); cy += 0.3;
       const pH = estH(a.analisePrevidenciario, 8.35, 10);
       sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 8.8, h: pH, fill: { color: P.WH } });
       sl.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: cy, w: 0.05, h: pH, fill: { color: "F97316" } });
@@ -377,7 +482,7 @@ async function generatePPTX(result) {
     bar(sl);
   });
 
-  // ── Conclusion Trabalhista — dynamic height ──
+  // Conclusions
   const sc1 = pres.addSlide(); sc1.background = { color: P.CR };
   sc1.addText("CONCLUSÃO — ÁREA TRABALHISTA", { x: 0.6, y: 0.3, w: 8, h: 0.4, fontSize: 10, color: P.BT, charSpacing: 3, bold: true, fontFace: "Calibri" });
   sc1.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.8, h: 0.03, fill: { color: "3B82F6" } });
@@ -387,7 +492,6 @@ async function generatePPTX(result) {
   sc1.addText(result.conclusaoTrabalhista || "", { x: 0.85, y: 1.05, w: 8.35, h: ctH - 0.15, fontSize: 10, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
   bar(sc1);
 
-  // ── Conclusion Previdenciária — dynamic height ──
   const sc2 = pres.addSlide(); sc2.background = { color: P.CR };
   sc2.addText("CONCLUSÃO — ÁREA TRIBUTÁRIA / PREVIDENCIÁRIA", { x: 0.6, y: 0.3, w: 9, h: 0.4, fontSize: 10, color: "9A3412", charSpacing: 3, bold: true, fontFace: "Calibri" });
   sc2.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.72, w: 1.8, h: 0.03, fill: { color: "F97316" } });
@@ -397,20 +501,19 @@ async function generatePPTX(result) {
   sc2.addText(result.conclusaoPrevidenciario || "", { x: 0.85, y: 1.05, w: 8.35, h: cpH - 0.15, fontSize: 10, color: P.DK, fontFace: "Calibri", valign: "top", margin: 0 });
   bar(sc2);
 
-  // ── Recommendations — full text ──
+  // Recommendations
   if (result.recomendacoes?.length) {
     const sr = pres.addSlide(); sr.background = { color: P.NV };
     sr.addText("RECOMENDAÇÕES", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: P.GD, charSpacing: 3, bold: true, fontFace: "Calibri" });
     sr.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.82, w: 1.5, h: 0.03, fill: { color: P.GD } });
-    const recPerSlide = 4;
     result.recomendacoes.forEach((rec, i) => {
-      if (i > 0 && i % recPerSlide === 0) {
-        bar(sr);
+      if (i > 0 && i % 4 === 0) {
+        bar(pres.slides[pres.slides.length - 1]);
         const sr2 = pres.addSlide(); sr2.background = { color: P.NV };
         sr2.addText("RECOMENDAÇÕES (CONT.)", { x: 0.8, y: 0.4, w: 8, h: 0.4, fontSize: 10, color: P.GD, charSpacing: 3, bold: true, fontFace: "Calibri" });
         sr2.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 0.82, w: 1.5, h: 0.03, fill: { color: P.GD } });
       }
-      const ry = 1.2 + (i % recPerSlide) * 1.0;
+      const ry = 1.2 + (i % 4) * 1.0;
       const slide = pres.slides[pres.slides.length - 1];
       slide.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: ry, w: 0.45, h: 0.45, fill: { color: P.GD } });
       slide.addText(String(i + 1).padStart(2, "0"), { x: 0.8, y: ry, w: 0.45, h: 0.45, fontSize: 12, color: P.NV, bold: true, align: "center", valign: "middle", fontFace: "Calibri" });
@@ -419,14 +522,14 @@ async function generatePPTX(result) {
     bar(pres.slides[pres.slides.length - 1]);
   }
 
-  // ── Pontos de Atenção — full text ──
+  // Pontos de Atenção
   if (result.pontosDeAtencao?.length) {
     const sp = pres.addSlide(); sp.background = { color: "FFFBEB" };
     sp.addText("PONTOS DE ATENÇÃO — CONFIRMAR COM O CLIENTE", { x: 0.6, y: 0.4, w: 9, h: 0.4, fontSize: 10, color: P.YT, charSpacing: 2, bold: true, fontFace: "Calibri" });
     sp.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.82, w: 2.5, h: 0.03, fill: { color: P.GD } });
     result.pontosDeAtencao.forEach((pt, i) => {
       if (i > 0 && i % 4 === 0) {
-        bar(sp);
+        bar(pres.slides[pres.slides.length - 1]);
         const sp2 = pres.addSlide(); sp2.background = { color: "FFFBEB" };
         sp2.addText("PONTOS DE ATENÇÃO (CONT.)", { x: 0.6, y: 0.4, w: 9, h: 0.4, fontSize: 10, color: P.YT, charSpacing: 2, bold: true, fontFace: "Calibri" });
         sp2.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.82, w: 2.5, h: 0.03, fill: { color: P.GD } });
@@ -434,14 +537,14 @@ async function generatePPTX(result) {
       const py = 1.1 + (i % 4) * 1.0;
       const slide = pres.slides[pres.slides.length - 1];
       slide.addText([
-        { text: "•  ", options: { fontSize: 14, color: P.GD, bold: true } },
+        { text: "◆  ", options: { fontSize: 12, color: P.GD, bold: true } },
         { text: pt, options: { fontSize: 10, color: "78350F" } }
       ], { x: 0.7, y: py, w: 8.5, h: 0.9, fontFace: "Calibri", valign: "top", margin: 0 });
     });
     bar(pres.slides[pres.slides.length - 1]);
   }
 
-  // ── Closing ──
+  // Closing
   const se = pres.addSlide(); se.background = { color: P.NV };
   se.addShape(pres.shapes.RECTANGLE, { x: 3.5, y: 1.8, w: 0.06, h: 0.8, fill: { color: P.GD } });
   se.addText([
@@ -507,30 +610,52 @@ export default function PLRAnalyzer() {
         const t = text.substring(0, 400000);
         userContent.push({ type: "text", text: `ACORDO COLETIVO DE PLR:\n\n${t}${text.length > 400000 ? "\n\n[... TRUNCADO ...]" : ""}` });
       }
-      userContent.push({ type: "text", text: "Analise o acordo coletivo de PLR acima conforme o checklist. Retorne o JSON conforme instruído. LEMBRETE: o JSON DEVE conter exatamente 9 aspectos, incluindo obrigatoriamente 'Pagamento a Diretores Estatutários'." });
-      const apiKey = process.env.REACT_APP_ANTHROPIC_API_KEY;
-      if (!apiKey) throw new Error("API key não configurada.");
+      userContent.push({ type: "text", text: "Analise o acordo coletivo de PLR acima conforme o checklist. Retorne APENAS o JSON conforme instruído, sem markdown. LEMBRETE: o JSON DEVE conter exatamente 9 aspectos, incluindo obrigatoriamente 'Pagamento a Diretores Estatutários'. Verifique se é Ltda ou S/A. Cite as datas extraídas do documento na análise de Data de Assinatura." });
+
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-        body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4000, temperature: 0, system: SYSTEM_PROMPT, messages: [{ role: "user", content: userContent }] })
+        headers: {
+          "Content-Type": "application/json",
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4096,
+          temperature: 0,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: userContent }]
+        })
       });
-      if (!response.ok) { const e = await response.json().catch(() => ({})); throw new Error(e.error?.message || `Erro: ${response.status}`); }
+      if (!response.ok) {
+        const e = await response.json().catch(() => ({}));
+        throw new Error(e.error?.message || `Erro da API: ${response.status} ${response.statusText}`);
+      }
       const data = await response.json();
       const raw = data.content.map(i => i.text || "").join("");
-      let parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-      // Validate and patch missing aspects
+      let parsed;
+      try {
+        parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      } catch (parseErr) {
+        console.error("Raw API response:", raw);
+        throw new Error("Resposta da API não é JSON válido. Verifique o console para detalhes.");
+      }
       parsed = validateAndPatchAspects(parsed);
       setResult(parsed);
       setStep("result");
-    } catch (err) { setError(err.message || "Erro desconhecido."); setStep("upload"); }
-    finally { setLoading(false); }
+    } catch (err) {
+      console.error("Analysis error:", err);
+      setError(err.message || "Erro desconhecido.");
+      setStep("upload");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handlePPTX = async () => {
     if (!result) return;
     setPptxLoading(true);
-    try { await generatePPTX(result); }
+    try { await generatePPTX(result, file?.name); }
     catch (err) { alert("Erro ao gerar PPTX: " + err.message); }
     finally { setPptxLoading(false); }
   };
@@ -547,7 +672,12 @@ export default function PLRAnalyzer() {
   const RiskBox = ({ label, risk }) => {
     if (!risk) return null;
     const c = riskBadgeColor(risk);
-    return (<div style={{ minWidth: "140px", padding: "10px 14px", borderRadius: "4px", border: `1px solid ${c.border}`, background: c.bg, textAlign: "center" }}><div style={{ fontSize: "9px", letterSpacing: "1px", color: "#6B7280", marginBottom: "4px", fontWeight: "600" }}>{label}</div><div style={{ fontSize: "12px", fontWeight: "700", color: c.color }}>{risk}</div></div>);
+    return (
+      <div style={{ minWidth: "140px", padding: "10px 14px", borderRadius: "4px", border: `1px solid ${c.border}`, background: c.bg, textAlign: "center" }}>
+        <div style={{ fontSize: "9px", letterSpacing: "1px", color: "#6B7280", marginBottom: "4px", fontWeight: "600" }}>{label}</div>
+        <div style={{ fontSize: "12px", fontWeight: "700", color: c.color }}>{risk}</div>
+      </div>
+    );
   };
 
   const AspectCard = ({ aspecto: a }) => {
@@ -557,7 +687,7 @@ export default function PLRAnalyzer() {
       <div style={{ background: isPlaceholder ? "#FFFBEB" : "#fff", borderRadius: "4px", border: `1px solid ${isPlaceholder ? "#FCD34D" : "#E8E2D9"}`, borderLeft: `4px solid ${isPlaceholder ? "#F59E0B" : cfg.border}`, padding: "24px 28px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", marginBottom: "16px" }}>
           <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px", flexWrap: "wrap" }}>
               <div style={{ color: "#0A1628", fontWeight: "700", fontSize: "15px" }}>{a.titulo}</div>
               <span style={{ background: cfg.bg, color: cfg.color, padding: "3px 12px", borderRadius: "2px", fontSize: "10px", letterSpacing: "1px", fontWeight: "700", whiteSpace: "nowrap" }}>{cfg.icon} {a.status}</span>
               {isPlaceholder && <span style={{ background: "#FEF3C7", color: "#92400E", padding: "3px 10px", borderRadius: "2px", fontSize: "9px", letterSpacing: "0.5px", fontWeight: "700", whiteSpace: "nowrap" }}>⚠ REVISÃO MANUAL</span>}
@@ -570,29 +700,55 @@ export default function PLRAnalyzer() {
             {!a.apenasTrabalista && a.riscoPrevidenciario && <RiskBox label="TRIBUTÁRIO / PREVIDENCIÁRIO" risk={a.riscoPrevidenciario} />}
           </div>
         </div>
-        {a.analiseTrabalhista && (<div style={{ marginBottom: a.analisePrevidenciario ? "12px" : 0 }}>{a.analisePrevidenciario && <div style={{ fontSize: "10px", letterSpacing: "1px", color: "#1E40AF", fontWeight: "700", marginBottom: "4px" }}>ANÁLISE TRABALHISTA</div>}<p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>{a.analiseTrabalhista}</p></div>)}
-        {a.analisePrevidenciario && !a.apenasTrabalista && (<div><div style={{ fontSize: "10px", letterSpacing: "1px", color: "#9A3412", fontWeight: "700", marginBottom: "4px" }}>ANÁLISE TRIBUTÁRIA / PREVIDENCIÁRIA</div><p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>{a.analisePrevidenciario}</p></div>)}
+        {a.analiseTrabalhista && (
+          <div style={{ marginBottom: a.analisePrevidenciario && !a.apenasTrabalista ? "12px" : 0 }}>
+            {a.analisePrevidenciario && !a.apenasTrabalista && <div style={{ fontSize: "10px", letterSpacing: "1px", color: "#1E40AF", fontWeight: "700", marginBottom: "4px" }}>ANÁLISE TRABALHISTA</div>}
+            <p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>{a.analiseTrabalhista}</p>
+          </div>
+        )}
+        {a.analisePrevidenciario && !a.apenasTrabalista && (
+          <div>
+            <div style={{ fontSize: "10px", letterSpacing: "1px", color: "#9A3412", fontWeight: "700", marginBottom: "4px" }}>ANÁLISE TRIBUTÁRIA / PREVIDENCIÁRIA</div>
+            <p style={{ color: "#4B5563", fontSize: "14px", lineHeight: 1.75, margin: 0 }}>{a.analisePrevidenciario}</p>
+          </div>
+        )}
       </div>
     );
   };
 
   const Section = ({ title, items, color }) => {
     if (!items?.length) return null;
-    return (<div style={{ marginBottom: "24px" }}><h4 style={{ color: "#0A1628", fontSize: "12px", letterSpacing: "2px", margin: "0 0 12px", paddingBottom: "6px", borderBottom: `2px solid ${color}`, fontWeight: "700" }}>{title}</h4><div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{items.map((a, i) => <AspectCard key={i} aspecto={a} />)}</div></div>);
+    return (
+      <div style={{ marginBottom: "24px" }}>
+        <h4 style={{ color: "#0A1628", fontSize: "12px", letterSpacing: "2px", margin: "0 0 12px", paddingBottom: "6px", borderBottom: `2px solid ${color}`, fontWeight: "700" }}>{title}</h4>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>{items.map((a, i) => <AspectCard key={i} aspecto={a} />)}</div>
+      </div>
+    );
   };
 
   const ScoreBlock = ({ label, score, classificacao }) => {
     const c = riskConfig[classificacao] || riskConfig["RISCO MODERADO"];
-    return (<div style={{ textAlign: "center", flex: 1 }}><div style={{ color: "rgba(245,242,236,0.5)", fontSize: "9px", letterSpacing: "2px", marginBottom: "6px" }}>{label}</div><div style={{ color: "#B8962E", fontSize: "44px", fontWeight: "700", lineHeight: 1 }}>{score}</div><span style={{ ...c, display: "inline-block", marginTop: "8px", padding: "4px 14px", borderRadius: "2px", fontSize: "10px", letterSpacing: "1.5px", fontWeight: "700" }}>{classificacao}</span></div>);
+    return (
+      <div style={{ textAlign: "center", flex: 1 }}>
+        <div style={{ color: "rgba(245,242,236,0.5)", fontSize: "9px", letterSpacing: "2px", marginBottom: "6px" }}>{label}</div>
+        <div style={{ color: "#B8962E", fontSize: "44px", fontWeight: "700", lineHeight: 1 }}>{score}</div>
+        <span style={{ ...c, display: "inline-block", marginTop: "8px", padding: "4px 14px", borderRadius: "2px", fontSize: "10px", letterSpacing: "1.5px", fontWeight: "700" }}>{classificacao}</span>
+      </div>
+    );
   };
 
   const g = result ? groupAspects(result.aspectos) : null;
 
   return (
     <div style={{ minHeight: "100vh", background: "#F5F2EC", fontFamily: "'Georgia', serif" }}>
-      <header style={{ background: "#FFD600", borderBottom: "4px solid #FFD600", padding: "16px 48px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
-        <MM_LOGO height={100} />
-        <div style={{ textAlign: "right" }}><div style={{ color: "#0A1628", fontSize: "11px", letterSpacing: "3px", marginBottom: "2px", fontWeight: "600" }}>ÁREA TRABALHISTA</div><div style={{ color: "#0A1628", fontSize: "13px", letterSpacing: "1px" }}>Analisador de Compliance PLR</div></div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @media print{header,button,.no-print{display:none!important}body{background:white!important}}`}</style>
+
+      <header className="no-print" style={{ background: "#FFD600", borderBottom: "4px solid #B8962E", padding: "12px 48px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, zIndex: 100 }}>
+        <MMLogo height={44} />
+        <div style={{ textAlign: "right" }}>
+          <div style={{ color: "#0A1628", fontSize: "11px", letterSpacing: "3px", marginBottom: "2px", fontWeight: "600" }}>ÁREA TRABALHISTA</div>
+          <div style={{ color: "#0A1628", fontSize: "13px", letterSpacing: "1px" }}>Analisador de Compliance PLR</div>
+        </div>
       </header>
 
       {step === "upload" && (
@@ -617,7 +773,17 @@ export default function PLRAnalyzer() {
                 style={{ border: `2px dashed ${dragOver ? "#B8962E" : file ? "#166534" : "#D1C9BB"}`, borderRadius: "4px", padding: "48px", textAlign: "center", cursor: "pointer", background: dragOver ? "rgba(184,150,46,0.04)" : file ? "rgba(22,101,52,0.03)" : "#FAFAF8", transition: "all 0.2s" }}>
                 <input id="fi" type="file" accept=".pdf,.doc,.docx,.txt" style={{ display: "none" }} onChange={(e) => setFile(e.target.files[0])} />
                 <div style={{ fontSize: "32px", marginBottom: "12px" }}>{file ? "📄" : "⬆"}</div>
-                {file ? (<><div style={{ color: "#166534", fontWeight: "700", fontSize: "15px" }}>{file.name}</div><div style={{ color: "#6B7280", fontSize: "12px", marginTop: "4px" }}>{(file.size / 1024).toFixed(1)} KB</div></>) : (<><div style={{ color: "#0A1628", fontWeight: "600", fontSize: "15px" }}>Arraste o arquivo ou clique para selecionar</div><div style={{ color: "#9CA3AF", fontSize: "12px", marginTop: "6px" }}>PDF, DOCX, TXT</div></>)}
+                {file ? (
+                  <>
+                    <div style={{ color: "#166534", fontWeight: "700", fontSize: "15px" }}>{file.name}</div>
+                    <div style={{ color: "#6B7280", fontSize: "12px", marginTop: "4px" }}>{(file.size / 1024).toFixed(1)} KB</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ color: "#0A1628", fontWeight: "600", fontSize: "15px" }}>Arraste o arquivo ou clique para selecionar</div>
+                    <div style={{ color: "#9CA3AF", fontSize: "12px", marginTop: "6px" }}>PDF, DOCX, TXT</div>
+                  </>
+                )}
               </div>
             </div>
             {error && <div style={{ background: "#FEE2E2", border: "1px solid #FCA5A5", borderRadius: "4px", padding: "16px 20px", marginBottom: "24px", color: "#991B1B", fontSize: "14px" }}>⚠ {error}</div>}
@@ -630,7 +796,6 @@ export default function PLRAnalyzer() {
         {step === "analyzing" && (
           <div style={{ textAlign: "center", padding: "100px 40px" }}>
             <div style={{ width: "64px", height: "64px", border: "3px solid #E8E2D9", borderTopColor: "#B8962E", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 32px" }}/>
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}} @media print{header,button,.no-print{display:none!important}body{background:white!important}}`}</style>
             <h3 style={{ color: "#0A1628", fontSize: "20px", fontWeight: "400", margin: "0 0 12px" }}>Analisando o acordo...</h3>
             <p style={{ color: "#6B7280", fontSize: "14px", lineHeight: 1.7 }}>Verificando cada cláusula contra a Lei 10.101/2000, jurisprudência do CARF e tribunais.</p>
           </div>
@@ -638,6 +803,7 @@ export default function PLRAnalyzer() {
 
         {step === "result" && result && (
           <div>
+            {/* Report Header */}
             <div style={{ background: "#0A1628", borderRadius: "4px", padding: "48px", marginBottom: "32px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px" }}>
                 <div>
@@ -646,16 +812,29 @@ export default function PLRAnalyzer() {
                   <h2 style={{ color: "#B8962E", fontSize: "18px", fontWeight: "400", margin: 0 }}>Acordo Coletivo de PLR · Lei 10.101/2000</h2>
                   <div style={{ color: "rgba(245,242,236,0.4)", fontSize: "11px", marginTop: "8px" }}>{new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
                 </div>
-                <MM_LOGO height={70} />
+                <div style={{ textAlign: "right" }}>
+                  <MMLogo height={44} color="#F5F2EC" />
+                  {file && <div style={{ color: "rgba(245,242,236,0.35)", fontSize: "10px", marginTop: "8px" }}>Arquivo: {file.name}</div>}
+                </div>
               </div>
               <div style={{ display: "flex", gap: "24px", alignItems: "center" }}>
                 <ScoreBlock label="SCORE TRABALHISTA" score={result.scoreTrabalhista} classificacao={result.classificacaoTrabalhista} />
                 <div style={{ width: "1px", height: "80px", background: "rgba(184,150,46,0.3)" }}/>
                 <ScoreBlock label="SCORE TRIBUTÁRIO / PREV." score={result.scorePrevidenciario} classificacao={result.classificacaoPrevidenciario} />
-                {result.scoreNuance !== undefined && (<><div style={{ width: "1px", height: "80px", background: "rgba(184,150,46,0.3)" }}/><div style={{ textAlign: "center", flex: 1 }}><div style={{ color: "rgba(245,242,236,0.5)", fontSize: "9px", letterSpacing: "2px", marginBottom: "6px" }}>SCORE DE NUANCE</div><div style={{ color: "#F5F2EC", fontSize: "32px", fontWeight: "700", lineHeight: 1 }}>{result.scoreNuance}</div><div style={{ color: "rgba(245,242,236,0.35)", fontSize: "9px", marginTop: "6px" }}>Média: Data + Metas ± Diretores</div></div></>)}
+                {result.scoreNuance !== undefined && (
+                  <>
+                    <div style={{ width: "1px", height: "80px", background: "rgba(184,150,46,0.3)" }}/>
+                    <div style={{ textAlign: "center", flex: 1 }}>
+                      <div style={{ color: "rgba(245,242,236,0.5)", fontSize: "9px", letterSpacing: "2px", marginBottom: "6px" }}>SCORE DE NUANCE</div>
+                      <div style={{ color: "#F5F2EC", fontSize: "32px", fontWeight: "700", lineHeight: 1 }}>{result.scoreNuance}</div>
+                      <div style={{ color: "rgba(245,242,236,0.35)", fontSize: "9px", marginTop: "6px" }}>{result.formulaNuance || "Média: Data + Metas ± Diretores"}</div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
+            {/* Aspects */}
             <div style={{ marginBottom: "32px" }}>
               <h3 style={{ color: "#0A1628", fontSize: "13px", letterSpacing: "3px", margin: "0 0 20px", borderBottom: "2px solid #B8962E", paddingBottom: "8px" }}>I. ANÁLISE POR ASPECTOS</h3>
               <Section title="CONFORME" items={g.conforme} color="#86EFAC" />
@@ -664,6 +843,7 @@ export default function PLRAnalyzer() {
               {g.dispensados?.length > 0 && <Section title="EMPREGADOS DISPENSADOS OU AFASTADOS (APENAS TRABALHISTA)" items={g.dispensados} color="#93C5FD" />}
             </div>
 
+            {/* Conclusions */}
             <div style={{ marginBottom: "24px" }}>
               <h3 style={{ color: "#0A1628", fontSize: "13px", letterSpacing: "3px", margin: "0 0 20px", borderBottom: "2px solid #B8962E", paddingBottom: "8px" }}>II. CONCLUSÃO</h3>
               <div style={{ background: "#fff", borderRadius: "4px", border: "1px solid #E8E2D9", borderLeft: "4px solid #3B82F6", padding: "28px 36px", marginBottom: "16px" }}>
@@ -676,6 +856,7 @@ export default function PLRAnalyzer() {
               </div>
             </div>
 
+            {/* Recommendations */}
             <div style={{ background: "#0A1628", borderRadius: "4px", padding: "36px 40px", marginBottom: "24px" }}>
               <h3 style={{ color: "#B8962E", fontSize: "13px", letterSpacing: "3px", margin: "0 0 24px", borderBottom: "1px solid rgba(184,150,46,0.3)", paddingBottom: "8px" }}>III. RECOMENDAÇÕES</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -688,13 +869,14 @@ export default function PLRAnalyzer() {
               </div>
             </div>
 
+            {/* Pontos de Atenção */}
             {result.pontosDeAtencao?.length > 0 && (
               <div style={{ background: "#FFFBEB", borderRadius: "4px", border: "1px solid #FCD34D", padding: "28px 36px", marginBottom: "24px" }}>
                 <h3 style={{ color: "#92400E", fontSize: "13px", letterSpacing: "3px", margin: "0 0 16px" }}>IV. PONTOS DE ATENÇÃO — CONFIRMAR COM O CLIENTE</h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {result.pontosDeAtencao.map((p, i) => (
                     <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                      <span style={{ color: "#B8962E", fontWeight: "700", fontSize: "13px", minWidth: "16px" }}>•</span>
+                      <span style={{ color: "#B8962E", fontWeight: "700", fontSize: "13px", minWidth: "16px" }}>◆</span>
                       <p style={{ color: "#78350F", fontSize: "14px", lineHeight: 1.65, margin: 0 }}>{p}</p>
                     </div>
                   ))}
@@ -702,12 +884,20 @@ export default function PLRAnalyzer() {
               </div>
             )}
 
+            {/* Footer */}
             <div style={{ borderTop: "1px solid #D1C9BB", paddingTop: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "40px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}><div style={{ width: "3px", height: "36px", background: "#B8962E" }}/><div><div style={{ color: "#0A1628", fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>MACHADO MEYER ADVOGADOS</div><div style={{ color: "#9CA3AF", fontSize: "11px" }}>Área Trabalhista · Consultoria</div></div></div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ width: "3px", height: "36px", background: "#B8962E" }}/>
+                <div>
+                  <div style={{ color: "#0A1628", fontSize: "12px", fontWeight: "700", letterSpacing: "1px" }}>MACHADO MEYER ADVOGADOS</div>
+                  <div style={{ color: "#9CA3AF", fontSize: "11px" }}>Área Trabalhista · Consultoria</div>
+                </div>
+              </div>
               <div style={{ color: "#9CA3AF", fontSize: "11px", textAlign: "right" }}>Documento gerado por IA · Uso interno<br/>Sujeito à revisão do advogado responsável</div>
             </div>
 
-            <div style={{ display: "flex", gap: "12px" }}>
+            {/* Action Buttons */}
+            <div className="no-print" style={{ display: "flex", gap: "12px" }}>
               <button onClick={() => window.print()} style={{ flex: 1, padding: "14px", background: "#B8962E", color: "#fff", border: "none", borderRadius: "4px", fontSize: "13px", fontFamily: "'Georgia', serif", letterSpacing: "2px", cursor: "pointer" }}>EXPORTAR PDF</button>
               <button onClick={handlePPTX} disabled={pptxLoading} style={{ flex: 1, padding: "14px", background: "#0A1628", color: "#F5F2EC", border: "none", borderRadius: "4px", fontSize: "13px", fontFamily: "'Georgia', serif", letterSpacing: "2px", cursor: pptxLoading ? "wait" : "pointer", opacity: pptxLoading ? 0.7 : 1 }}>{pptxLoading ? "GERANDO..." : "EXPORTAR PPTX"}</button>
               <button onClick={reset} style={{ flex: 1, padding: "14px", background: "transparent", color: "#0A1628", border: "2px solid #0A1628", borderRadius: "4px", fontSize: "13px", fontFamily: "'Georgia', serif", letterSpacing: "2px", cursor: "pointer" }}>NOVA ANÁLISE</button>
@@ -718,5 +908,3 @@ export default function PLRAnalyzer() {
     </div>
   );
 }
-
-
